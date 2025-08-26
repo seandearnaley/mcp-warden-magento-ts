@@ -26,7 +26,7 @@ export function registerMagentoTools(server: McpServer, projectRoot: string) {
       const cleanOutput = cleanMagentoOutput(rawOutput);
       return {
         content: [
-          { type: "text", text: `${projectInfo} Cache Clean\n\n${cleanOutput || "Cache cleaned successfully"}` },
+          { type: "text", text: `${projectInfo} Cache Clean\n\n${cleanOutput ?? "Cache cleaned successfully"}` },
         ],
       };
     }
@@ -49,7 +49,7 @@ export function registerMagentoTools(server: McpServer, projectRoot: string) {
       const cleanOutput = cleanMagentoOutput(rawOutput);
       return {
         content: [
-          { type: "text", text: `${projectInfo} Cache Flush\n\n${cleanOutput || "Cache flushed successfully"}` },
+          { type: "text", text: `${projectInfo} Cache Flush\n\n${cleanOutput ?? "Cache flushed successfully"}` },
         ],
       };
     }
@@ -64,7 +64,7 @@ export function registerMagentoTools(server: McpServer, projectRoot: string) {
       content: [
         {
           type: "text",
-          text: `${projectInfo} Setup Upgrade\n\n${cleanOutput || "Setup upgrade completed successfully"}`,
+          text: `${projectInfo} Setup Upgrade\n\n${cleanOutput ?? "Setup upgrade completed successfully"}`,
         },
       ],
     };
@@ -86,24 +86,25 @@ export function registerMagentoTools(server: McpServer, projectRoot: string) {
           content: [
             {
               type: "text",
-              text: `${projectInfo} DI Compile Completed (${duration}s)\n\n${cleanOutput || "DI compilation completed successfully"}`,
+              text: `${projectInfo} DI Compile Completed (${duration}s)\n\n${cleanOutput ?? "DI compilation completed successfully"}`,
             },
           ],
         };
       } else {
         return {
           content: [
-            { type: "text", text: `${projectInfo} DI Compile Failed (${duration}s)\n\n${cleanOutput || res.stderr}` },
+            { type: "text", text: `${projectInfo} DI Compile Failed (${duration}s)\n\n${cleanOutput ?? res.stderr}` },
           ],
         };
       }
-    } catch (error) {
+    } catch (error: unknown) {
       const duration = Math.round((Date.now() - startTime) / 1000);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       return {
         content: [
           {
             type: "text",
-            text: `${projectInfo} DI Compile Error (${duration}s)\n\nOperation failed: ${error instanceof Error ? error.message : String(error)}`,
+            text: `${projectInfo} DI Compile Error (${duration}s)\n\nOperation failed: ${errorMessage}`,
           },
         ],
       };
@@ -140,7 +141,7 @@ export function registerMagentoTools(server: McpServer, projectRoot: string) {
         content: [
           {
             type: "text",
-            text: `${projectInfo} Static Deploy\n\n${cleanOutput || "Static content deployed successfully"}`,
+            text: `${projectInfo} Static Deploy\n\n${cleanOutput ?? "Static content deployed successfully"}`,
           },
         ],
       };
@@ -155,7 +156,7 @@ export function registerMagentoTools(server: McpServer, projectRoot: string) {
       content: [
         {
           type: "text",
-          text: `${projectInfo} Indexer Reindex\n\n${cleanOutput || "Reindexing completed successfully"}`,
+          text: `${projectInfo} Indexer Reindex\n\n${cleanOutput ?? "Reindexing completed successfully"}`,
         },
       ],
     };
@@ -167,7 +168,7 @@ export function registerMagentoTools(server: McpServer, projectRoot: string) {
     const cleanOutput = cleanMagentoOutput(rawOutput);
     return {
       content: [
-        { type: "text", text: `${projectInfo} Mode Show\n\n${cleanOutput || "Unable to determine deploy mode"}` },
+        { type: "text", text: `${projectInfo} Mode Show\n\n${cleanOutput ?? "Unable to determine deploy mode"}` },
       ],
     };
   });
@@ -187,7 +188,7 @@ export function registerMagentoTools(server: McpServer, projectRoot: string) {
         content: [
           {
             type: "text",
-            text: `${projectInfo} Mode Set\n\n${cleanOutput || `Deploy mode set to ${mode} successfully`}`,
+            text: `${projectInfo} Mode Set\n\n${cleanOutput ?? `Deploy mode set to ${mode} successfully`}`,
           },
         ],
       };
@@ -210,7 +211,7 @@ export function registerMagentoTools(server: McpServer, projectRoot: string) {
         content: [
           {
             type: "text",
-            text: `${projectInfo} Config Set\n\n${cleanOutput || `Configuration ${path} set successfully`}`,
+            text: `${projectInfo} Config Set\n\n${cleanOutput ?? `Configuration ${path} set successfully`}`,
           },
         ],
       };
