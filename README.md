@@ -224,7 +224,7 @@ node dist/index.js --warden-root /Users/yourname/Documents/GitLab/anotherwarden/
 ## 📊 Logging
 
 ### Log Levels & Environment Configuration
-- **Development** (`NODE_ENV=development`): Debug-level console logging with colors
+- **Development** (`NODE_ENV=development`): Debug-level console logging with colors (disabled automatically in MCP stdio mode)
 - **Production** (`NODE_ENV=production`): Warning-level file logging with rotation
 
 ### File Logging (Production)
@@ -236,6 +236,7 @@ When `NODE_ENV=production` or `LOG_TO_FILE=true`:
 - `NODE_ENV` — Set to `production` for production logging
 - `LOG_TO_FILE` — Set to `true` to enable file logging in any environment  
 - `LOG_DIR` — Custom log directory (defaults to `./logs`)
+- `MCP_STDIO_MODE` — When `true`, disables console logging to protect MCP stdio transport
 
 ### Examples
 ```bash
@@ -266,6 +267,15 @@ npx @modelcontextprotocol/inspector node dist/index.js --warden-root /path/to/wa
 # In Inspector UI, try: magento.cacheClean with { "types": ["config"] }
 # Or: warden.projectInfo (no parameters needed)
 ```
+
+### Automated Tests
+
+- Unit tests (Vitest): `pnpm run test:unit`
+- E2E tests (Playwright): `pnpm run test:e2e`
+
+Notes:
+- Unit tests cover env parsing/redaction, output cleaning, and input validation.
+- E2E scaffolding is in place (Playwright) and ready to extend with a stubbed `warden` binary and an MCP stdio client.
 
 ## 🔒 Security
 

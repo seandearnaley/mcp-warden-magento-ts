@@ -4,6 +4,26 @@ import * as path from "node:path";
 import { isWardenProject, readDotEnv } from "./env.js";
 import { createLogger } from "./logger.js";
 
+function redactArgsForLog(cmd: string, args: string[]): string[] {
+  const out = [...args];
+  try {
+    // Redact Magento config:set value argument
+    const magentoIdx = out.findIndex((a) => a.endsWith("bin/magento"));
+    if (cmd === "warden" && magentoIdx !== -1) {
+      const cfgIdx = out.indexOf("config:set", magentoIdx);
+      if (cfgIdx !== -1) {
+        const valueIdx = cfgIdx + 2; // config:set <path> <value>
+        if (valueIdx < out.length) {
+          out[valueIdx] = "***redacted***";
+        }
+      }
+    }
+  } catch {
+    // Best-effort redaction only
+  }
+  return out;
+}
+
 export type RunResult = { ok: boolean; code: number | null; stdout: string; stderr: string; durationMs: number };
 
 export async function run(
@@ -15,9 +35,9 @@ export async function run(
 ): Promise<RunResult> {
   const logger = createLogger("exec");
   const start = Date.now();
-  const command = `${cmd} ${args.join(" ")}`;
-
-  logger.debug(`Executing command: ${command} in ${cwd}`);
+  const loggedArgs = redactArgsForLog(cmd, args);
+  const commandForLog = `${cmd} ${loggedArgs.join(" ")}`;
+  logger.debug(`Executing command: ${commandForLog} in ${cwd}`);
 
   return await new Promise((resolve) => {
     const child = spawn(cmd, args, {
@@ -29,7 +49,7 @@ export async function run(
       stderr = "";
     const timer = setTimeout(() => {
       try {
-        logger.warn(`Command timed out after ${timeoutMs}ms: ${command}`);
+        logger.warn(`Command timed out after ${timeoutMs}ms: ${commandForLog}`);
         child.kill("SIGKILL");
       } catch {
         // Ignore errors when killing process
@@ -46,9 +66,9 @@ export async function run(
       const durationMs = Date.now() - start;
 
       if (code === 0) {
-        logger.debug(`Command completed successfully in ${durationMs}ms: ${command}`);
+        logger.debug(`Command completed successfully in ${durationMs}ms: ${commandForLog}`);
       } else {
-        logger.warn(`Command failed with code ${code} in ${durationMs}ms: ${command}`);
+        logger.warn(`Command failed with code ${code} in ${durationMs}ms: ${commandForLog}`);
         if (stderr) {
           logger.debug(`Command stderr: ${stderr}`);
         }

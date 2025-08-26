@@ -4,6 +4,21 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { wardenExec, wardenLogsTail, getProjectInfo } from "../lib/exec.js";
 import { readDotEnv, sanitizeEnv } from "../lib/env.js";
 
+export function validateWardenExecInput(service: unknown, argv: unknown): { ok: boolean; reason?: string } {
+  if (typeof service !== "string" || !/^[a-z0-9-]+$/i.test(service) || service.length === 0 || service.length > 32) {
+    return { ok: false, reason: "invalid service name" };
+  }
+  if (!Array.isArray(argv) || argv.length === 0 || argv.length > 50) {
+    return { ok: false, reason: "invalid argv" };
+  }
+  for (const a of argv) {
+    if (typeof a !== "string" || a.length === 0 || a.length > 200 || /[\n\r\0]/.test(a)) {
+      return { ok: false, reason: "invalid argv" };
+    }
+  }
+  return { ok: true };
+}
+
 export function registerWardenTools(server: McpServer, projectRoot: string) {
   const projectInfo = getProjectInfo(projectRoot);
 
@@ -16,6 +31,17 @@ export function registerWardenTools(server: McpServer, projectRoot: string) {
     },
     async (args) => {
       const { service, argv } = args as { service: string; argv: string[] };
+      const validation = validateWardenExecInput(service, argv);
+      if (!validation.ok) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `${projectInfo} Exec Validation Error\n\nRequest rejected due to ${validation.reason}.`,
+            },
+          ],
+        };
+      }
       const res = await wardenExec(projectRoot, service, argv);
       const text = res.ok ? res.stdout : `${res.stdout}\n${res.stderr}`;
       return { content: [{ type: "text", text: `${projectInfo} Exec [${service}] ${argv.join(" ")}\n\n${text}` }] };

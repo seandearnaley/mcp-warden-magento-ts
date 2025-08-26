@@ -13,6 +13,9 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
     "check": "pnpm run lint && pnpm run format:check",
+    "test": "vitest run",
+    "test:unit": "vitest run --coverage",
+    "test:e2e": "playwright test",
     "fix": "pnpm run lint:fix && pnpm run format",
     "watch": "concurrently \"pnpm run tsc:watch\" \"pnpm run lint:watch\"",
     "tsc:watch": "tsc --watch --noEmit",
@@ -25,6 +28,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",
+    "@playwright/test": "^1.47.2",
     "@types/node": "^24.3.0",
     "@typescript-eslint/eslint-plugin": "^8.41.0",
     "@typescript-eslint/parser": "^8.41.0",
@@ -35,6 +39,8 @@
     "prettier": "^3.6.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "typescript-eslint": "^8.41.0"
+    "typescript-eslint": "^8.41.0",
+    "vitest": "^2.0.5",
+    "@vitest/coverage-v8": "^2.0.5"
   }
 }
