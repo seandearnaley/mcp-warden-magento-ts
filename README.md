@@ -37,13 +37,88 @@ npx @modelcontextprotocol/inspector pnpm start
     { "projectRoot": "/absolute/path/to/your/warden/magento2/project" }
     ```
 
-4) **Run with Claude Desktop (stdio)**
+4) **Project-Specific Setup (Recommended)**
 
-- Add a local MCP server pointing to your project:
-  - **Command:** `pnpm`
-  - **Args:** `start` (for production) or `run dev` (for development)
-  - **CWD:** the repo folder
-- Then invoke tools by name (e.g., "Run `magento.setupUpgrade` in /path/to/project").
+Instead of passing `projectRoot` to every tool call, you can run project-specific MCP servers using the warden environment folder:
+
+```bash
+# For lv-magento project
+npx @modelcontextprotocol/inspector node dist/index.js --warden-root /Users/seandearnaley/Documents/GitLab/lv-magento/warden-envs
+
+# For lv-pfizer project  
+npx @modelcontextprotocol/inspector node dist/index.js --warden-root /Users/seandearnaley/Documents/GitLab/lv-pfizer/warden-envs-pfizer-harper
+```
+
+This approach:
+- ✅ Eliminates the need to specify `projectRoot` in every tool call
+- ✅ Provides clear server names like `mcp-warden-magento-lv-magento`
+- ✅ Allows running multiple project servers simultaneously
+- ✅ Makes tool responses clearly identify which project they target
+
+## Client Installation
+
+### Claude Desktop
+
+Add entries to your Claude Desktop MCP configuration (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "warden-lv-magento": {
+      "command": "node",
+      "args": ["/path/to/mcp-warden-magento-ts/dist/index.js", "--warden-root", "/Users/seandearnaley/Documents/GitLab/lv-magento/warden-envs"],
+      "cwd": "/path/to/mcp-warden-magento-ts"
+    },
+    "warden-lv-pfizer": {
+      "command": "node", 
+      "args": ["/path/to/mcp-warden-magento-ts/dist/index.js", "--warden-root", "/Users/seandearnaley/Documents/GitLab/lv-pfizer/warden-envs-pfizer-harper"],
+      "cwd": "/path/to/mcp-warden-magento-ts"
+    }
+  }
+}
+```
+
+### Cursor IDE
+
+Add to your Cursor settings (`.cursor-settings/settings.json`):
+
+```json
+{
+  "mcp.servers": {
+    "warden-lv-magento": {
+      "command": "node",
+      "args": ["/path/to/mcp-warden-magento-ts/dist/index.js", "--warden-root", "/Users/seandearnaley/Documents/GitLab/lv-magento/warden-envs"],
+      "cwd": "/path/to/mcp-warden-magento-ts"
+    },
+    "warden-lv-pfizer": {
+      "command": "node",
+      "args": ["/path/to/mcp-warden-magento-ts/dist/index.js", "--warden-root", "/Users/seandearnaley/Documents/GitLab/lv-pfizer/warden-envs-pfizer-harper"], 
+      "cwd": "/path/to/mcp-warden-magento-ts"
+    }
+  }
+}
+```
+
+### Claude Code (VS Code Extension)
+
+Add to your VS Code `settings.json`:
+
+```json
+{
+  "claude-code.mcpServers": {
+    "warden-lv-magento": {
+      "command": "node",
+      "args": ["/path/to/mcp-warden-magento-ts/dist/index.js", "--warden-root", "/Users/seandearnaley/Documents/GitLab/lv-magento/warden-envs"],
+      "cwd": "/path/to/mcp-warden-magento-ts"
+    },
+    "warden-lv-pfizer": {
+      "command": "node",
+      "args": ["/path/to/mcp-warden-magento-ts/dist/index.js", "--warden-root", "/Users/seandearnaley/Documents/GitLab/lv-pfizer/warden-envs-pfizer-harper"],
+      "cwd": "/path/to/mcp-warden-magento-ts"
+    }
+  }
+}
+```
 
 > Ensure your Warden project is started: from the **project root** run `warden env start`.
 > The server’s tools expect `.env` (created by `warden env-init`) to be present in the project root.
@@ -85,30 +160,33 @@ Warden helpers:
 
 ## Multiple environments
 
-Just pass the **right `projectRoot`** and we’ll run in that environment. The Warden `.env` inside that folder ensures the correct containers are targeted.
+With the project-specific server approach, each MCP server is bound to a single Warden project at startup. This eliminates confusion and makes multi-project workflows much cleaner.
 
-### Examples with separate Magento/Warden/logs folders
+### Examples with your GitLab layout
 
-If your host layout keeps projects under `~/Documents/GitLab` and you run multiple environments simultaneously, e.g.:
+For your setup with projects under `~/Documents/GitLab`:
 
-- `/Users/seandearnaley/Documents/GitLab/lv-magento/` (Magento project A)
-- `/Users/seandearnaley/Documents/GitLab/lv-pfizer/` (Magento project B)
-- `/Users/seandearnaley/Documents/GitLab/warden/` (shared helpers or logs; optional)
+- `/Users/seandearnaley/Documents/GitLab/lv-magento/warden-envs` (Warden env A)
+- `/Users/seandearnaley/Documents/GitLab/lv-pfizer/warden-envs-pfizer-harper` (Warden env B)
 
-Use the Magento project root (the directory containing `.env` created by `warden env-init`) as `projectRoot` for each call:
+Run separate MCP servers:
 
-```json
-{ "projectRoot": "/Users/seandearnaley/Documents/GitLab/lv-magento" }
+```bash
+# Terminal 1: lv-magento server
+node dist/index.js --warden-root /Users/seandearnaley/Documents/GitLab/lv-magento/warden-envs
+
+# Terminal 2: lv-pfizer server  
+node dist/index.js --warden-root /Users/seandearnaley/Documents/GitLab/lv-pfizer/warden-envs-pfizer-harper
 ```
 
-```json
-{ "projectRoot": "/Users/seandearnaley/Documents/GitLab/lv-pfizer" }
-```
+Or configure both in your MCP client (Claude Desktop, Cursor, etc.) as shown in the Client Installation section above.
 
-Notes:
-- Warden resolves the correct environment based on the `.env` in `projectRoot`; no global state is required.
-- If your logs live elsewhere on the host, you can still tail container logs via tools here; host log folders are not required for MCP usage.
-- **All tool responses now include project identification** in the format `[project-name/env-name @ domain]` to make it crystal clear which environment was targeted.
+### Benefits of project-specific servers:
+- ✅ **No confusion**: Each server is clearly named (e.g., `mcp-warden-magento-lv-magento`)
+- ✅ **Simpler tool calls**: No need to specify `projectRoot` parameter
+- ✅ **Clear responses**: All outputs are prefixed with `[project-name/env-name @ domain]`
+- ✅ **Concurrent usage**: Run multiple servers simultaneously for different projects
+- ✅ **Warden env isolation**: Each server uses the correct `.env` from its project root
 
 ---
 
