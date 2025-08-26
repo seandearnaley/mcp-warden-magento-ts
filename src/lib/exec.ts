@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { isWardenProject } from "./env.js";
+import { isWardenProject, readDotEnv } from "./env.js";
 
 export type RunResult = { ok: boolean; code: number | null; stdout: string; stderr: string; durationMs: number };
 
@@ -28,10 +28,10 @@ export async function run(
         // Ignore errors when killing process
       }
     }, timeoutMs);
-    child.stdout.on("data", (d) => {
+    child.stdout.on("data", (d: Buffer) => {
       stdout += d.toString();
     });
-    child.stderr.on("data", (d) => {
+    child.stderr.on("data", (d: Buffer) => {
       stderr += d.toString();
     });
     child.on("close", (code) => {
@@ -46,6 +46,14 @@ export function assertWardenProject(projectRoot: string) {
   const envPath = path.join(projectRoot, ".env");
   if (!fs.existsSync(envPath)) throw new Error(`.env not found in ${projectRoot}. Is this a Warden project?`);
   if (!isWardenProject(projectRoot)) throw new Error(`WARDEN_ENV_NAME missing in ${envPath}`);
+}
+
+export function getProjectInfo(projectRoot: string): string {
+  const env = readDotEnv(projectRoot);
+  const envName = env["WARDEN_ENV_NAME"] || "unknown";
+  const domain = env["TRAEFIK_DOMAIN"] || "";
+  const projectName = path.basename(projectRoot);
+  return `[${projectName}/${envName}${domain ? ` @ ${domain}` : ""}]`;
 }
 
 export function wardenMagento(

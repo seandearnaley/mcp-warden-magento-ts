@@ -3,12 +3,16 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { assertWardenProject, wardenExec, wardenLogsTail } from "../lib/exec.js";
+import { assertWardenProject, wardenExec, wardenLogsTail, getProjectInfo } from "../lib/exec.js";
 import { readDotEnv, sanitizeEnv, isWardenProject } from "../lib/env.js";
 
 const projectSchema = {
   projectRoot: z.string().describe("Absolute path to the Warden project root (directory containing .env)"),
 };
+
+interface DirentWithName extends fs.Dirent {
+  name: string;
+}
 
 function defaultScanDirs(): string[] {
   const home = os.homedir();
@@ -18,7 +22,12 @@ function defaultScanDirs(): string[] {
       .split(":")
       .map((s) => s.trim())
       .filter(Boolean);
-  const candidates = [path.join(home, "Sites"), path.join(home, "Projects")];
+  const candidates = [
+    path.join(home, "Sites"),
+    path.join(home, "Projects"),
+    // Common macOS path when repos live under Documents/GitLab
+    path.join(home, "Documents", "GitLab"),
+  ];
   return candidates.filter((p) => fs.existsSync(p) && fs.statSync(p).isDirectory());
 }
 
@@ -31,26 +40,26 @@ export function registerWardenTools(server: McpServer) {
       service: z.string().describe("Container service name"),
       argv: z.array(z.string()).describe("Command and args, e.g. ['bash','-lc','ls -la']"),
     },
-    async ({ projectRoot, service, argv }) => {
+    async (args) => {
+      const { projectRoot, service, argv } = args as { projectRoot: string; service: string; argv: string[] };
       assertWardenProject(projectRoot);
+      const projectInfo = getProjectInfo(projectRoot);
       const res = await wardenExec(projectRoot, service, argv);
       const text = res.ok ? res.stdout : `${res.stdout}\n${res.stderr}`;
-      return { content: [{ type: "text", text }] };
+      return { content: [{ type: "text", text: `${projectInfo} Exec [${service}] ${argv.join(" ")}\n\n${text}` }] };
     }
   );
 
-  server.tool(
-    "warden.varnishFlush",
-    "Varnish ban all: varnishadm 'ban req.url ~ .'",
-    projectSchema,
-    async ({ projectRoot }) => {
-      assertWardenProject(projectRoot);
-      const res = await wardenExec(projectRoot, "varnish", ["varnishadm", "ban", "req.url ~ ."]);
-      return { content: [{ type: "text", text: res.ok ? res.stdout : res.stderr }] };
-    }
-  );
+  server.tool("warden.varnishFlush", "Varnish ban all: varnishadm 'ban req.url ~ .'", projectSchema, async (args) => {
+    const { projectRoot } = args as { projectRoot: string };
+    assertWardenProject(projectRoot);
+    const projectInfo = getProjectInfo(projectRoot);
+    const res = await wardenExec(projectRoot, "varnish", ["varnishadm", "ban", "req.url ~ ."]);
+    return { content: [{ type: "text", text: `${projectInfo} Varnish Flush\n\n${res.ok ? res.stdout : res.stderr}` }] };
+  });
 
-  server.tool("warden.redisFlushAll", "Redis flushall (USE WITH CAUTION)", projectSchema, async ({ projectRoot }) => {
+  server.tool("warden.redisFlushAll", "Redis flushall (USE WITH CAUTION)", projectSchema, async (args) => {
+    const { projectRoot } = args as { projectRoot: string };
     assertWardenProject(projectRoot);
     const res = await wardenExec(projectRoot, "redis", ["redis-cli", "flushall"]);
     return { content: [{ type: "text", text: res.ok ? res.stdout : res.stderr }] };
@@ -64,24 +73,26 @@ export function registerWardenTools(server: McpServer) {
       services: z.array(z.string()).default(["nginx", "php-fpm"]),
       tailLines: z.number().int().min(1).max(5000).default(200),
     },
-    async ({ projectRoot, services, tailLines }) => {
+    async (args) => {
+      const { projectRoot, services, tailLines } = args as {
+        projectRoot: string;
+        services: string[];
+        tailLines: number;
+      };
+      assertWardenProject(projectRoot);
       const res = await wardenLogsTail(projectRoot, services, tailLines);
       return { content: [{ type: "text", text: res.ok ? res.stdout : res.stderr }] };
     }
   );
 
-  server.tool(
-    "warden.showEnv",
-    "Read and return sanitized .env for a Warden project",
-    projectSchema,
-    ({ projectRoot }) => {
-      const env = sanitizeEnv(readDotEnv(projectRoot));
-      const lines = Object.entries(env)
-        .map(([k, v]) => `${k}=${v}`)
-        .join("\n");
-      return { content: [{ type: "text", text: lines || "(empty)" }] };
-    }
-  );
+  server.tool("warden.showEnv", "Read and return sanitized .env for a Warden project", projectSchema, (args) => {
+    const { projectRoot } = args as { projectRoot: string };
+    const env = sanitizeEnv(readDotEnv(projectRoot));
+    const lines = Object.entries(env)
+      .map(([k, v]) => `${k}=${v}`)
+      .join("\n");
+    return { content: [{ type: "text", text: lines || "(empty)" }] };
+  });
 
   server.tool(
     "warden.discoverProjects",
@@ -89,14 +100,15 @@ export function registerWardenTools(server: McpServer) {
     {
       scanDirs: z.array(z.string()).optional(),
     },
-    ({ scanDirs }) => {
+    (args) => {
+      const { scanDirs } = args as { scanDirs?: string[] };
       const dirs = (scanDirs && scanDirs.length > 0 ? scanDirs : defaultScanDirs()).filter(
         (p: string) => fs.existsSync(p) && fs.statSync(p).isDirectory()
       );
 
       const found: { path: string; envName: string | null; traefik?: string }[] = [];
       for (const base of dirs) {
-        const entries = fs.readdirSync(base, { withFileTypes: true });
+        const entries = fs.readdirSync(base, { withFileTypes: true }) as DirentWithName[];
         for (const e of entries) {
           if (!e.isDirectory()) continue;
           const p = path.join(base, e.name);

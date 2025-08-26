@@ -14,10 +14,20 @@ A minimal, safe **Model Context Protocol (MCP)** server that exposes a toolbox f
 pnpm i
 ```
 
-2) **Run with MCP Inspector (recommended for testing)**
+2) **Build for production (recommended)**
 
 ```bash
+pnpm run build
+```
+
+3) **Run with MCP Inspector (recommended for testing)**
+
+```bash
+# For development (may have tsx startup messages):
 npx @modelcontextprotocol/inspector pnpm run dev
+
+# For production (clean stdio):
+npx @modelcontextprotocol/inspector pnpm start
 ```
 
 - In the Inspector UI, you should see the server name `mcp-warden-magento`.
@@ -27,13 +37,13 @@ npx @modelcontextprotocol/inspector pnpm run dev
     { "projectRoot": "/absolute/path/to/your/warden/magento2/project" }
     ```
 
-3) **Run with Claude Desktop (stdio)**
+4) **Run with Claude Desktop (stdio)**
 
 - Add a local MCP server pointing to your project:
   - **Command:** `pnpm`
-  - **Args:** `run dev`
+  - **Args:** `start` (for production) or `run dev` (for development)
   - **CWD:** the repo folder
-- Then invoke tools by name (e.g., “Run `magento.setupUpgrade` in /path/to/project”).
+- Then invoke tools by name (e.g., "Run `magento.setupUpgrade` in /path/to/project").
 
 > Ensure your Warden project is started: from the **project root** run `warden env start`.
 > The server’s tools expect `.env` (created by `warden env-init`) to be present in the project root.
@@ -77,6 +87,29 @@ Warden helpers:
 
 Just pass the **right `projectRoot`** and we’ll run in that environment. The Warden `.env` inside that folder ensures the correct containers are targeted.
 
+### Examples with separate Magento/Warden/logs folders
+
+If your host layout keeps projects under `~/Documents/GitLab` and you run multiple environments simultaneously, e.g.:
+
+- `/Users/seandearnaley/Documents/GitLab/lv-magento/` (Magento project A)
+- `/Users/seandearnaley/Documents/GitLab/lv-pfizer/` (Magento project B)
+- `/Users/seandearnaley/Documents/GitLab/warden/` (shared helpers or logs; optional)
+
+Use the Magento project root (the directory containing `.env` created by `warden env-init`) as `projectRoot` for each call:
+
+```json
+{ "projectRoot": "/Users/seandearnaley/Documents/GitLab/lv-magento" }
+```
+
+```json
+{ "projectRoot": "/Users/seandearnaley/Documents/GitLab/lv-pfizer" }
+```
+
+Notes:
+- Warden resolves the correct environment based on the `.env` in `projectRoot`; no global state is required.
+- If your logs live elsewhere on the host, you can still tail container logs via tools here; host log folders are not required for MCP usage.
+- **All tool responses now include project identification** in the format `[project-name/env-name @ domain]` to make it crystal clear which environment was targeted.
+
 ---
 
 ## Requirements
@@ -84,6 +117,15 @@ Just pass the **right `projectRoot`** and we’ll run in that environment. The W
 - Node.js >= 18
 - Warden installed and services up (`brew install wardenenv/warden/warden && warden svc up`)
 - A Warden Magento 2 project initialized (`warden env-init`) and started (`warden env start`)
+
+## Important: Zod Compatibility
+
+This project requires **Zod 3.x** for compatibility with the MCP SDK. If you encounter `keyValidator._parse is not a function` errors, ensure you're using the correct Zod version:
+
+```bash
+pnpm remove zod && pnpm add zod@^3.23.8
+pnpm run build
+```
 
 ---
 
@@ -105,7 +147,13 @@ Just pass the **right `projectRoot`** and we’ll run in that environment. The W
 
 ## Project discovery
 
-You can configure where `warden.discoverProjects` scans by setting env var **`MCP_WARDEN_SCAN_DIRS`** to a colon-separated list of directories (e.g., `/Users/you/Sites:/Users/you/Projects`). If unset, it will try a couple of common folders under your home directory (`Sites`, `Projects`) if they exist.
+You can configure where `warden.discoverProjects` scans by setting env var **`MCP_WARDEN_SCAN_DIRS`** to a colon-separated list of directories (e.g., `/Users/you/Sites:/Users/you/Projects:/Users/you/Documents/GitLab`). If unset, it will try common folders under your home directory (`Sites`, `Projects`, and `Documents/GitLab` when present).
+
+Example to prefer your GitLab workspace on macOS:
+
+```bash
+export MCP_WARDEN_SCAN_DIRS="/Users/seandearnaley/Documents/GitLab"
+```
 
 ---
 

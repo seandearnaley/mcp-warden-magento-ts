@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { assertWardenProject, wardenMagento } from "../lib/exec.js";
+import { assertWardenProject, wardenMagento, getProjectInfo } from "../lib/exec.js";
 
 const projectSchema = {
   projectRoot: z.string().describe("Absolute path to the Warden project root (directory containing .env)"),
@@ -14,11 +14,17 @@ export function registerMagentoTools(server: McpServer) {
       ...projectSchema,
       types: z.array(z.string()).optional(),
     },
-    async ({ projectRoot, types }) => {
+    async (args) => {
+      const { projectRoot, types } = args as { projectRoot: string; types?: string[] };
       assertWardenProject(projectRoot);
-      const res = await wardenMagento(projectRoot, ["cache:clean", ...(types ?? [])]);
+      const projectInfo = getProjectInfo(projectRoot);
+      const magentoArgs: string[] = ["cache:clean"];
+      if (types && types.length > 0) {
+        magentoArgs.push(...types);
+      }
+      const res = await wardenMagento(projectRoot, magentoArgs);
       const text = res.ok ? res.stdout : `${res.stdout}\n${res.stderr}`;
-      return { content: [{ type: "text", text }] };
+      return { content: [{ type: "text", text: `${projectInfo} Cache Clean\n\n${text}` }] };
     }
   );
 
@@ -29,10 +35,16 @@ export function registerMagentoTools(server: McpServer) {
       ...projectSchema,
       types: z.array(z.string()).optional(),
     },
-    async ({ projectRoot, types }) => {
+    async (args) => {
+      const { projectRoot, types } = args as { projectRoot: string; types?: string[] };
       assertWardenProject(projectRoot);
-      const res = await wardenMagento(projectRoot, ["cache:flush", ...(types ?? [])]);
-      return { content: [{ type: "text", text: res.ok ? res.stdout : res.stderr }] };
+      const projectInfo = getProjectInfo(projectRoot);
+      const magentoArgs: string[] = ["cache:flush"];
+      if (types && types.length > 0) {
+        magentoArgs.push(...types);
+      }
+      const res = await wardenMagento(projectRoot, magentoArgs);
+      return { content: [{ type: "text", text: `${projectInfo} Cache Flush\n\n${res.ok ? res.stdout : res.stderr}` }] };
     }
   );
 
@@ -40,16 +52,19 @@ export function registerMagentoTools(server: McpServer) {
     "magento.setupUpgrade",
     "Runs bin/magento setup:upgrade then cache:clean",
     projectSchema,
-    async ({ projectRoot }) => {
+    async (args) => {
+      const { projectRoot } = args as { projectRoot: string };
       assertWardenProject(projectRoot);
+      const projectInfo = getProjectInfo(projectRoot);
       const up = await wardenMagento(projectRoot, ["setup:upgrade"]);
       const cc = await wardenMagento(projectRoot, ["cache:clean"]);
       const text = [up.stdout, cc.stdout, up.stderr, cc.stderr].filter(Boolean).join("\n");
-      return { content: [{ type: "text", text }] };
+      return { content: [{ type: "text", text: `${projectInfo} Setup Upgrade\n\n${text}` }] };
     }
   );
 
-  server.tool("magento.diCompile", "Runs bin/magento setup:di:compile", projectSchema, async ({ projectRoot }) => {
+  server.tool("magento.diCompile", "Runs bin/magento setup:di:compile", projectSchema, async (args) => {
+    const { projectRoot } = args as { projectRoot: string };
     assertWardenProject(projectRoot);
     const res = await wardenMagento(projectRoot, ["setup:di:compile"]);
     return { content: [{ type: "text", text: res.ok ? res.stdout : res.stderr }] };
@@ -65,25 +80,36 @@ export function registerMagentoTools(server: McpServer) {
       jobs: z.number().int().min(0).optional(),
       force: z.boolean().optional(),
     },
-    async ({ projectRoot, languages, area, jobs, force }) => {
+    async (args) => {
+      const { projectRoot, languages, area, jobs, force } = args as {
+        projectRoot: string;
+        languages?: string[];
+        area?: "adminhtml" | "frontend";
+        jobs?: number;
+        force?: boolean;
+      };
       assertWardenProject(projectRoot);
-      const args = ["setup:static-content:deploy"];
-      if (languages?.length) args.push(...languages);
-      if (area) args.push("--area", area);
-      if (typeof jobs === "number") args.push("--jobs", String(jobs));
-      if (force) args.push("--force");
-      const res = await wardenMagento(projectRoot, args);
+      const magentoArgs: string[] = ["setup:static-content:deploy"];
+      if (languages && languages.length > 0) {
+        magentoArgs.push(...languages);
+      }
+      if (area) magentoArgs.push("--area", area);
+      if (typeof jobs === "number") magentoArgs.push("--jobs", String(jobs));
+      if (force) magentoArgs.push("--force");
+      const res = await wardenMagento(projectRoot, magentoArgs);
       return { content: [{ type: "text", text: res.ok ? res.stdout : res.stderr }] };
     }
   );
 
-  server.tool("magento.indexerReindex", "Runs bin/magento indexer:reindex", projectSchema, async ({ projectRoot }) => {
+  server.tool("magento.indexerReindex", "Runs bin/magento indexer:reindex", projectSchema, async (args) => {
+    const { projectRoot } = args as { projectRoot: string };
     assertWardenProject(projectRoot);
     const res = await wardenMagento(projectRoot, ["indexer:reindex"]);
     return { content: [{ type: "text", text: res.ok ? res.stdout : res.stderr }] };
   });
 
-  server.tool("magento.modeShow", "Shows Magento deploy mode", projectSchema, async ({ projectRoot }) => {
+  server.tool("magento.modeShow", "Shows Magento deploy mode", projectSchema, async (args) => {
+    const { projectRoot } = args as { projectRoot: string };
     assertWardenProject(projectRoot);
     const res = await wardenMagento(projectRoot, ["deploy:mode:show"]);
     return { content: [{ type: "text", text: res.ok ? res.stdout : res.stderr }] };
@@ -96,7 +122,8 @@ export function registerMagentoTools(server: McpServer) {
       ...projectSchema,
       mode: z.enum(["developer", "production"]).describe("Deploy mode to set"),
     },
-    async ({ projectRoot, mode }) => {
+    async (args) => {
+      const { projectRoot, mode } = args as { projectRoot: string; mode: "developer" | "production" };
       assertWardenProject(projectRoot);
       const res = await wardenMagento(projectRoot, ["deploy:mode:set", mode]);
       return { content: [{ type: "text", text: res.ok ? res.stdout : res.stderr }] };
@@ -111,7 +138,8 @@ export function registerMagentoTools(server: McpServer) {
       path: z.string(),
       value: z.string(),
     },
-    async ({ projectRoot, path, value }) => {
+    async (args) => {
+      const { projectRoot, path, value } = args as { projectRoot: string; path: string; value: string };
       assertWardenProject(projectRoot);
       const res = await wardenMagento(projectRoot, ["config:set", path, value]);
       return { content: [{ type: "text", text: res.ok ? res.stdout : res.stderr }] };
@@ -125,7 +153,8 @@ export function registerMagentoTools(server: McpServer) {
       ...projectSchema,
       path: z.string(),
     },
-    async ({ projectRoot, path }) => {
+    async (args) => {
+      const { projectRoot, path } = args as { projectRoot: string; path: string };
       assertWardenProject(projectRoot);
       const res = await wardenMagento(projectRoot, ["config:show", path]);
       return { content: [{ type: "text", text: res.ok ? res.stdout : res.stderr }] };
