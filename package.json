@@ -7,7 +7,6 @@
     "dev": "tsx src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "start:silent": "pnpm --silent start",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "lint:watch": "eslint src/**/*.ts --watch",

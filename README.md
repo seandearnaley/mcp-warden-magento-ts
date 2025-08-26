@@ -28,6 +28,15 @@ pnpm run build
 npx @modelcontextprotocol/inspector node dist/index.js --warden-root /Users/yourname/Documents/GitLab/warden-envs
 ```
 
+### Development Mode
+
+For development with auto-reload (local terminal use only):
+```bash
+pnpm run dev --warden-root /Users/yourname/Documents/GitLab/warden-envs
+```
+
+**Note**: `pnpm run dev` outputs startup messages that break MCP Inspector's stdio protocol. Use the built version (`node dist/index.js`) for MCP Inspector and client configurations.
+
 ## 📋 Requirements
 
 - **Node.js** ≥ 18
@@ -263,7 +272,7 @@ npx @modelcontextprotocol/inspector node dist/index.js --warden-root /path/to/wa
 - **Structured inputs only**: All tools use Zod validation, no arbitrary shell execution
 - **Container isolation**: Commands run inside Warden containers via `warden env exec`
 - **Environment validation**: Server validates Warden project structure on startup
-- **Timeout protection**: All commands have execution timeouts (5 minutes default)
+- **Smart timeouts**: Commands have execution timeouts (5 minutes default, 15 minutes for long operations like DI compile)
 - **Sanitized output**: Environment variables are redacted in logs and responses
 
 ## 🚨 Troubleshooting
@@ -285,6 +294,12 @@ npx @modelcontextprotocol/inspector node dist/index.js --warden-root /path/to/wa
 - Ensure absolute paths in client configuration
 - Check that the built `dist/index.js` file exists
 - Verify Node.js ≥ 18 is installed
+
+**"Request timed out" for DI compile or static deploy**
+- These operations can take 10-20 minutes on large projects
+- **MCP Inspector**: Increase timeout in Configuration → `MCP_SERVER_REQUEST_TIMEOUT` to 1200000 (20 minutes)
+- **Cursor/Claude**: The server automatically extends timeouts for long operations (20 minutes for DI compile)
+- If still timing out, the operation may be stuck - check Magento logs
 
 ### Debug Mode
 ```bash

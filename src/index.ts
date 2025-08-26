@@ -6,6 +6,9 @@ import { assertWardenProject } from "./lib/exec.js";
 import { logger } from "./lib/logger.js";
 import * as path from "node:path";
 
+// Set environment variable to prevent console logging in stdio mode
+process.env.MCP_STDIO_MODE = "true";
+
 // Parse command line arguments
 const args = process.argv.slice(2);
 const wardenRootIndex = args.findIndex((arg) => arg === "--warden-root");

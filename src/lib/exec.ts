@@ -76,13 +76,45 @@ export function getProjectInfo(projectRoot: string): string {
 export function wardenMagento(
   projectRoot: string,
   magentoArgs: string[],
-  phpFlags: string[] = ["-d", "memory_limit=-1"]
+  phpFlags: string[] = ["-d", "memory_limit=-1"],
+  timeoutMs?: number
 ) {
+  // Set longer timeouts for operations that can take a while
+  const defaultTimeout = 5 * 60_000; // 5 minutes
+  let operationTimeout = timeoutMs || defaultTimeout;
+  
+  // Increase timeout for known long-running operations
+  const longRunningOps = ['setup:di:compile', 'setup:static-content:deploy', 'setup:upgrade', 'indexer:reindex'];
+  if (longRunningOps.some(op => magentoArgs.includes(op))) {
+    operationTimeout = 15 * 60_000; // 15 minutes for long operations
+  }
+  
   return run(
     "warden",
     ["env", "exec", "-T", "php-fpm", "php", ...phpFlags, "bin/magento", ...magentoArgs],
-    projectRoot
+    projectRoot,
+    operationTimeout
   );
+}
+
+// Helper function to clean up Magento CLI output
+export function cleanMagentoOutput(output: string): string {
+  if (!output) return output;
+  
+  // Split into lines and filter out debug noise
+  const lines = output.split('\n');
+  const cleanLines = lines.filter(line => {
+    const trimmed = line.trim();
+    // Filter out debug logs, empty lines, and other noise
+    return trimmed && 
+           !trimmed.startsWith('[') && // Remove timestamp logs like [2025-08-26 03:24:36]
+           !trimmed.includes('main.DEBUG:') && // Remove debug logs
+           !trimmed.includes('cache_invalidate:') && // Remove cache invalidation logs
+           !trimmed.includes('{"method":"GET"') && // Remove JSON debug info
+           !trimmed.startsWith('[]'); // Remove empty array logs
+  });
+  
+  return cleanLines.join('\n').trim();
 }
 
 export function wardenExec(projectRoot: string, service: string, argv: string[]) {

@@ -29,13 +29,6 @@ const level = () => {
   return isDevelopment ? "debug" : "warn";
 };
 
-// Define format for console output
-const consoleFormat = winston.format.combine(
-  winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss:ms" }),
-  winston.format.colorize({ all: true }),
-  winston.format.printf((info) => `${String(info.timestamp)} ${String(info.level)}: ${String(info.message)}`)
-);
-
 // Define format for file output (JSON for structured logging)
 const fileFormat = winston.format.combine(
   winston.format.timestamp(),
@@ -44,38 +37,34 @@ const fileFormat = winston.format.combine(
 );
 
 // Define transports
-const transports: winston.transport[] = [
-  // Console transport
-  new winston.transports.Console({
-    format: consoleFormat,
-  }),
-];
+const transports: winston.transport[] = [];
 
-// Add file transport in production or when LOG_TO_FILE is set
-if (process.env.NODE_ENV === "production" || process.env.LOG_TO_FILE === "true") {
-  const logDir = process.env.LOG_DIR ?? path.join(process.cwd(), "logs");
-  const logFile = path.join(logDir, "mcp-warden-magento.log");
+// NEVER add console transport for MCP servers - it breaks stdio JSON protocol
+// All logging goes to files only
 
-  transports.push(
-    new winston.transports.File({
-      filename: logFile,
-      format: fileFormat,
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
-    })
-  );
+// Always add file transport for MCP servers (no console output allowed)
+const logDir = process.env.LOG_DIR ?? path.join(process.cwd(), "logs");
+const logFile = path.join(logDir, "mcp-warden-magento.log");
 
-  // Separate error log file
-  transports.push(
-    new winston.transports.File({
-      filename: path.join(logDir, "mcp-warden-magento-error.log"),
-      level: "error",
-      format: fileFormat,
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
-    })
-  );
-}
+transports.push(
+  new winston.transports.File({
+    filename: logFile,
+    format: fileFormat,
+    maxsize: 5242880, // 5MB
+    maxFiles: 5,
+  })
+);
+
+// Separate error log file
+transports.push(
+  new winston.transports.File({
+    filename: path.join(logDir, "mcp-warden-magento-error.log"),
+    level: "error",
+    format: fileFormat,
+    maxsize: 5242880, // 5MB
+    maxFiles: 5,
+  })
+);
 
 // Create the logger
 export const logger = winston.createLogger({
