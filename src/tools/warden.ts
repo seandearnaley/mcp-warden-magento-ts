@@ -1,31 +1,8 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
-import * as os from "node:os";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { wardenExec, wardenLogsTail, getProjectInfo } from "../lib/exec.js";
-import { readDotEnv, sanitizeEnv, isWardenProject } from "../lib/env.js";
-
-interface DirentWithName extends fs.Dirent {
-  name: string;
-}
-
-function defaultScanDirs(): string[] {
-  const home = os.homedir();
-  const envVar = process.env.MCP_WARDEN_SCAN_DIRS;
-  if (envVar && envVar.trim().length > 0)
-    return envVar
-      .split(":")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  const candidates = [
-    path.join(home, "Sites"),
-    path.join(home, "Projects"),
-    // Common macOS path when repos live under Documents/GitLab
-    path.join(home, "Documents", "GitLab"),
-  ];
-  return candidates.filter((p) => fs.existsSync(p) && fs.statSync(p).isDirectory());
-}
+import { readDotEnv, sanitizeEnv } from "../lib/env.js";
 
 export function registerWardenTools(server: McpServer, projectRoot: string) {
   const projectInfo = getProjectInfo(projectRoot);
@@ -82,37 +59,22 @@ export function registerWardenTools(server: McpServer, projectRoot: string) {
     return { content: [{ type: "text", text: `${projectInfo} Environment\n\n${lines || "(empty)"}` }] };
   });
 
-  server.tool(
-    "warden.discoverProjects",
-    "Scan directories for Warden projects (folders containing .env with WARDEN_ENV_NAME)",
-    {
-      scanDirs: z.array(z.string()).optional(),
-    },
-    (args) => {
-      const { scanDirs } = args as { scanDirs?: string[] };
-      const dirs = (scanDirs && scanDirs.length > 0 ? scanDirs : defaultScanDirs()).filter(
-        (p: string) => fs.existsSync(p) && fs.statSync(p).isDirectory()
-      );
+  server.tool("warden.projectInfo", "Show information about the current Warden project", {}, () => {
+    const env = readDotEnv(projectRoot);
+    const projectName = path.basename(path.dirname(projectRoot));
+    const envName = env["WARDEN_ENV_NAME"] || "unknown";
+    const domain = env["TRAEFIK_DOMAIN"] || "not set";
+    const phpVersion = env["PHP_VERSION"] || "not set";
 
-      const found: { path: string; envName: string | null; traefik?: string }[] = [];
-      for (const base of dirs) {
-        const entries = fs.readdirSync(base, { withFileTypes: true }) as DirentWithName[];
-        for (const e of entries) {
-          if (!e.isDirectory()) continue;
-          const p = path.join(base, e.name);
-          const envPath = path.join(p, ".env");
-          if (fs.existsSync(envPath) && isWardenProject(p)) {
-            const env = readDotEnv(p);
-            found.push({ path: p, envName: env["WARDEN_ENV_NAME"] ?? null, traefik: env["TRAEFIK_DOMAIN"] });
-          }
-        }
-      }
-      const text = found.length
-        ? found
-            .map((f) => `${f.path}  (env: ${f.envName ?? "?"}${f.traefik ? `, traefik: ${f.traefik}` : ""})`)
-            .join("\n")
-        : "No Warden projects found.";
-      return { content: [{ type: "text", text: `Project Discovery\n\n${text}` }] };
-    }
-  );
+    const info = [
+      `Project: ${projectName}`,
+      `Environment: ${envName}`,
+      `Domain: ${domain}`,
+      `PHP Version: ${phpVersion}`,
+      `Warden Root: ${projectRoot}`,
+      `Project Root: ${path.dirname(projectRoot)}`,
+    ].join("\n");
+
+    return { content: [{ type: "text", text: `${projectInfo} Project Information\n\n${info}` }] };
+  });
 }

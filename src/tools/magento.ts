@@ -1,9 +1,13 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { wardenMagento, getProjectInfo } from "../lib/exec.js";
+import { createLogger } from "../lib/logger.js";
 
 export function registerMagentoTools(server: McpServer, projectRoot: string) {
+  const logger = createLogger("magento-tools");
   const projectInfo = getProjectInfo(projectRoot);
+
+  logger.info(`Registering Magento tools for project: ${projectInfo}`);
 
   server.tool(
     "magento.cacheClean",

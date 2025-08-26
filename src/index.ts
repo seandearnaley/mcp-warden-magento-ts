@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { registerMagentoTools } from "./tools/magento.js";
 import { registerWardenTools } from "./tools/warden.js";
 import { assertWardenProject } from "./lib/exec.js";
+import { logger } from "./lib/logger.js";
 import * as path from "node:path";
 
 // Parse command line arguments
@@ -14,23 +15,33 @@ const wardenRoot =
 // Validate warden root
 try {
   assertWardenProject(wardenRoot);
+  logger.info(`Warden project validated successfully at: ${wardenRoot}`);
 } catch (error) {
-  console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
-  console.error(`Usage: node dist/index.js --warden-root /path/to/warden/env/folder`);
-  console.error(
-    `Example: node dist/index.js --warden-root /Users/seandearnaley/Documents/GitLab/lv-magento/warden-envs`
-  );
+  logger.error(`Warden project validation failed: ${error instanceof Error ? error.message : String(error)}`);
+  logger.error(`Usage: node dist/index.js --warden-root /path/to/warden/env/folder`);
+  logger.error(`Example: node dist/index.js --warden-root /Users/yourname/Documents/GitLab/warden-envs`);
   process.exit(1);
 }
 
+// Get project info for better identification
+const projectName = path.basename(path.dirname(wardenRoot));
+
 const server = new McpServer({
-  name: `mcp-warden-magento-${path.basename(wardenRoot)}`,
+  name: `warden-magento-${projectName}`,
   version: "1.0.0",
-  capabilities: { tools: {} },
+  capabilities: {
+    tools: {},
+    resources: {},
+    prompts: {},
+  },
 });
+
+logger.info(`Initializing MCP server: mcp-warden-magento-${path.basename(wardenRoot)} v1.0.0`);
 
 registerMagentoTools(server, wardenRoot);
 registerWardenTools(server, wardenRoot);
 
 const transport = new StdioServerTransport();
+logger.info("Connecting to MCP transport...");
 await server.connect(transport);
+logger.info("MCP server connected successfully");

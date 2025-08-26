@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { isWardenProject, readDotEnv } from "./env.js";
+import { createLogger } from "./logger.js";
 
 export type RunResult = { ok: boolean; code: number | null; stdout: string; stderr: string; durationMs: number };
 
@@ -12,7 +13,12 @@ export async function run(
   timeoutMs = 5 * 60_000,
   env?: NodeJS.ProcessEnv
 ): Promise<RunResult> {
+  const logger = createLogger("exec");
   const start = Date.now();
+  const command = `${cmd} ${args.join(" ")}`;
+
+  logger.debug(`Executing command: ${command} in ${cwd}`);
+
   return await new Promise((resolve) => {
     const child = spawn(cmd, args, {
       cwd,
@@ -23,6 +29,7 @@ export async function run(
       stderr = "";
     const timer = setTimeout(() => {
       try {
+        logger.warn(`Command timed out after ${timeoutMs}ms: ${command}`);
         child.kill("SIGKILL");
       } catch {
         // Ignore errors when killing process
@@ -37,6 +44,16 @@ export async function run(
     child.on("close", (code) => {
       clearTimeout(timer);
       const durationMs = Date.now() - start;
+
+      if (code === 0) {
+        logger.debug(`Command completed successfully in ${durationMs}ms: ${command}`);
+      } else {
+        logger.warn(`Command failed with code ${code} in ${durationMs}ms: ${command}`);
+        if (stderr) {
+          logger.debug(`Command stderr: ${stderr}`);
+        }
+      }
+
       resolve({ ok: code === 0, code, stdout, stderr, durationMs });
     });
   });

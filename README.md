@@ -1,204 +1,42 @@
-# mcp-warden-magento (TypeScript, stdio)
+# Warden Magento MCP Server
 
-A minimal, safe **Model Context Protocol (MCP)** server that exposes a toolbox for **Magento 2** tasks inside **Warden** environments. It favors **stateless** execution via `warden env exec` (recommended), supports **multiple concurrent projects** by passing `projectRoot`, and is ready to use with **MCP Inspector** and **Claude Desktop**.
+A **Model Context Protocol (MCP)** server that provides AI assistants with safe, structured access to **Magento 2** operations within **Warden** environments. Each server instance is bound to a specific Warden project, eliminating confusion when working with multiple environments.
 
-> This repository deliberately avoids keeping PTY/shell sessions open. You can add that later if you prove a latency win. For most teams, ephemeral `warden env exec` is simpler and robust.
+## ✨ Features
 
----
+- 🎯 **Project-specific servers**: Each instance serves one Warden environment
+- 🔧 **Comprehensive Magento tools**: Cache management, setup, deployment, indexing
+- 🐳 **Warden integration**: Direct container execution via `warden env exec`
+- 🏷️ **Clear identification**: All responses show which project was targeted
+- 📊 **Production logging**: Winston-based logging with file rotation
+- 🔒 **Safe execution**: Structured inputs only, no arbitrary shell access
 
-## Quick start
+## 🚀 Quick Start
 
-1) **Install dependencies**
-
+1. **Install dependencies**
 ```bash
-pnpm i
+pnpm install
 ```
 
-2) **Build for production (recommended)**
-
+2. **Build the project**
 ```bash
 pnpm run build
 ```
 
-3) **Run with MCP Inspector (recommended for testing)**
-
+3. **Test with MCP Inspector**
 ```bash
-# For development (may have tsx startup messages):
-npx @modelcontextprotocol/inspector pnpm run dev
-
-# For production (clean stdio):
-npx @modelcontextprotocol/inspector pnpm start
+npx @modelcontextprotocol/inspector node dist/index.js --warden-root /Users/yourname/Documents/GitLab/warden-envs
 ```
 
-- In the Inspector UI, you should see the server name `mcp-warden-magento`.
-- Try a tool call:
-  - `magento.cacheClean` with input:
-    ```json
-    { "projectRoot": "/absolute/path/to/your/warden/magento2/project" }
-    ```
+## 📋 Requirements
 
-4) **Project-Specific Setup (Recommended)**
+- **Node.js** ≥ 18
+- **Warden** installed and services running (`brew install wardenenv/warden/warden && warden svc up`)
+- **Warden Magento 2 projects** initialized (`warden env-init`) and started (`warden env start`)
 
-Instead of passing `projectRoot` to every tool call, you can run project-specific MCP servers using the warden environment folder:
+## ⚠️ Important: Zod Compatibility
 
-```bash
-# For lv-magento project
-npx @modelcontextprotocol/inspector node dist/index.js --warden-root /Users/seandearnaley/Documents/GitLab/lv-magento/warden-envs
-
-# For lv-pfizer project  
-npx @modelcontextprotocol/inspector node dist/index.js --warden-root /Users/seandearnaley/Documents/GitLab/lv-pfizer/warden-envs-pfizer-harper
-```
-
-This approach:
-- ✅ Eliminates the need to specify `projectRoot` in every tool call
-- ✅ Provides clear server names like `mcp-warden-magento-lv-magento`
-- ✅ Allows running multiple project servers simultaneously
-- ✅ Makes tool responses clearly identify which project they target
-
-## Client Installation
-
-### Claude Desktop
-
-Add entries to your Claude Desktop MCP configuration (`~/Library/Application Support/Claude/claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "warden-lv-magento": {
-      "command": "node",
-      "args": ["/path/to/mcp-warden-magento-ts/dist/index.js", "--warden-root", "/Users/seandearnaley/Documents/GitLab/lv-magento/warden-envs"],
-      "cwd": "/path/to/mcp-warden-magento-ts"
-    },
-    "warden-lv-pfizer": {
-      "command": "node", 
-      "args": ["/path/to/mcp-warden-magento-ts/dist/index.js", "--warden-root", "/Users/seandearnaley/Documents/GitLab/lv-pfizer/warden-envs-pfizer-harper"],
-      "cwd": "/path/to/mcp-warden-magento-ts"
-    }
-  }
-}
-```
-
-### Cursor IDE
-
-Add to your Cursor settings (`.cursor-settings/settings.json`):
-
-```json
-{
-  "mcp.servers": {
-    "warden-lv-magento": {
-      "command": "node",
-      "args": ["/path/to/mcp-warden-magento-ts/dist/index.js", "--warden-root", "/Users/seandearnaley/Documents/GitLab/lv-magento/warden-envs"],
-      "cwd": "/path/to/mcp-warden-magento-ts"
-    },
-    "warden-lv-pfizer": {
-      "command": "node",
-      "args": ["/path/to/mcp-warden-magento-ts/dist/index.js", "--warden-root", "/Users/seandearnaley/Documents/GitLab/lv-pfizer/warden-envs-pfizer-harper"], 
-      "cwd": "/path/to/mcp-warden-magento-ts"
-    }
-  }
-}
-```
-
-### Claude Code (VS Code Extension)
-
-Add to your VS Code `settings.json`:
-
-```json
-{
-  "claude-code.mcpServers": {
-    "warden-lv-magento": {
-      "command": "node",
-      "args": ["/path/to/mcp-warden-magento-ts/dist/index.js", "--warden-root", "/Users/seandearnaley/Documents/GitLab/lv-magento/warden-envs"],
-      "cwd": "/path/to/mcp-warden-magento-ts"
-    },
-    "warden-lv-pfizer": {
-      "command": "node",
-      "args": ["/path/to/mcp-warden-magento-ts/dist/index.js", "--warden-root", "/Users/seandearnaley/Documents/GitLab/lv-pfizer/warden-envs-pfizer-harper"],
-      "cwd": "/path/to/mcp-warden-magento-ts"
-    }
-  }
-}
-```
-
-> Ensure your Warden project is started: from the **project root** run `warden env start`.
-> The server’s tools expect `.env` (created by `warden env-init`) to be present in the project root.
-
----
-
-## Why stateless?
-
-- Spawning `warden env exec -T php-fpm php bin/magento ...` per call is reliable, safe, and works across **many concurrent Warden environments** on one machine.
-- Keeping a persistent shell adds complexity (keepalive, reconnect, sanitization) and rarely improves real-world Magento CLI loops.
-
----
-
-## Tools (initial set)
-
-All tools accept a **`projectRoot`** parameter (absolute path to the Warden project).
-
-Magento‑focused:
-- `magento.cacheClean` — `bin/magento cache:clean [types?]`
-- `magento.cacheFlush` — `bin/magento cache:flush [types?]`
-- `magento.setupUpgrade` — `bin/magento setup:upgrade` then `cache:clean`
-- `magento.diCompile` — `bin/magento setup:di:compile`
-- `magento.staticDeploy` — `bin/magento setup:static-content:deploy [options]`
-- `magento.indexerReindex` — `bin/magento indexer:reindex`
-- `magento.modeShow` / `magento.modeSet` — show/set deploy mode
-- `magento.configSet` / `magento.configShow` — set/read config values
-
-Warden helpers:
-- `warden.exec` — generic `warden env exec -T <service> <argv...>`
-- `warden.varnishFlush` — `varnishadm 'ban req.url ~ .'`
-- `warden.redisFlushAll` — `redis flushall`
-- `warden.logsTail` — returns last N lines of selected services (no `-f` follow)
-- `warden.discoverProjects` — scan directories for Warden `.env` with `WARDEN_ENV_NAME`
-- `warden.showEnv` — dump safe `.env` pairs (redacts likely secrets)
-
-> You can expand these by following the patterns in `src/tools/*.ts`.
-
----
-
-## Multiple environments
-
-With the project-specific server approach, each MCP server is bound to a single Warden project at startup. This eliminates confusion and makes multi-project workflows much cleaner.
-
-### Examples with your GitLab layout
-
-For your setup with projects under `~/Documents/GitLab`:
-
-- `/Users/seandearnaley/Documents/GitLab/lv-magento/warden-envs` (Warden env A)
-- `/Users/seandearnaley/Documents/GitLab/lv-pfizer/warden-envs-pfizer-harper` (Warden env B)
-
-Run separate MCP servers:
-
-```bash
-# Terminal 1: lv-magento server
-node dist/index.js --warden-root /Users/seandearnaley/Documents/GitLab/lv-magento/warden-envs
-
-# Terminal 2: lv-pfizer server  
-node dist/index.js --warden-root /Users/seandearnaley/Documents/GitLab/lv-pfizer/warden-envs-pfizer-harper
-```
-
-Or configure both in your MCP client (Claude Desktop, Cursor, etc.) as shown in the Client Installation section above.
-
-### Benefits of project-specific servers:
-- ✅ **No confusion**: Each server is clearly named (e.g., `mcp-warden-magento-lv-magento`)
-- ✅ **Simpler tool calls**: No need to specify `projectRoot` parameter
-- ✅ **Clear responses**: All outputs are prefixed with `[project-name/env-name @ domain]`
-- ✅ **Concurrent usage**: Run multiple servers simultaneously for different projects
-- ✅ **Warden env isolation**: Each server uses the correct `.env` from its project root
-
----
-
-## Requirements
-
-- Node.js >= 18
-- Warden installed and services up (`brew install wardenenv/warden/warden && warden svc up`)
-- A Warden Magento 2 project initialized (`warden env-init`) and started (`warden env start`)
-
-## Important: Zod Compatibility
-
-This project requires **Zod 3.x** for compatibility with the MCP SDK. If you encounter `keyValidator._parse is not a function` errors, ensure you're using the correct Zod version:
+This project requires **Zod 3.x** for MCP SDK compatibility. If you encounter `keyValidator._parse is not a function` errors:
 
 ```bash
 pnpm remove zod && pnpm add zod@^3.23.8
@@ -207,40 +45,265 @@ pnpm run build
 
 ---
 
-## Scripts
+## 🎯 Primary Supported Clients
 
-- `pnpm run dev` — runs the MCP server via `tsx` (ESM, TypeScript)
-- `pnpm run build` — compiles TypeScript to `dist`
-- `pnpm start` — runs built JS via Node
+### 1. Cursor IDE (Recommended)
 
----
+**Installation:**
+1. Open Cursor settings: `Cmd/Ctrl + ,`
+2. Search for "MCP" or go to Extensions → MCP
+3. Add server configurations to your workspace or user settings
 
-## Security notes
-
-- Tools only accept structured inputs (Zod validated).
-- We **do not** expose arbitrary shell execution to the LLM.
-- Each command is spawned with a **timeout** and returns `stdout`, `stderr`, and exit code.
-
----
-
-## Project discovery
-
-You can configure where `warden.discoverProjects` scans by setting env var **`MCP_WARDEN_SCAN_DIRS`** to a colon-separated list of directories (e.g., `/Users/you/Sites:/Users/you/Projects:/Users/you/Documents/GitLab`). If unset, it will try common folders under your home directory (`Sites`, `Projects`, and `Documents/GitLab` when present).
-
-Example to prefer your GitLab workspace on macOS:
-
-```bash
-export MCP_WARDEN_SCAN_DIRS="/Users/seandearnaley/Documents/GitLab"
+**Configuration Example:**
+```json
+{
+  "mcp.servers": {
+    "warden-magento": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/mcp-warden-magento-ts/dist/index.js",
+        "--warden-root",
+        "/Users/yourname/Documents/GitLab/warden-envs"
+      ],
+      "cwd": "/absolute/path/to/mcp-warden-magento-ts"
+    },
+    "warden-anotherwarden": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/mcp-warden-magento-ts/dist/index.js",
+        "--warden-root", 
+        "/Users/yourname/Documents/GitLab/anotherwarden/warden-envs-anotherwarden"
+      ],
+      "cwd": "/absolute/path/to/mcp-warden-magento-ts"
+    }
+  }
+}
 ```
 
+**Usage in Cursor:**
+- Use `@warden-magento` to target the magento project
+- Use `@warden-anotherwarden` to target the anotherwarden project
+- Example: "Hey @warden-magento, clear the config cache"
+
+### 2. Claude Desktop
+
+**Installation:**
+1. Locate your Claude Desktop config: `~/Library/Application Support/Claude/claude_desktop_config.json`
+2. Add MCP server entries
+
+**Configuration Example:**
+```json
+{
+  "mcpServers": {
+    "warden-magento": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/mcp-warden-magento-ts/dist/index.js",
+        "--warden-root",
+        "/Users/yourname/Documents/GitLab/warden-envs"
+      ],
+      "cwd": "/absolute/path/to/mcp-warden-magento-ts"
+    },
+    "warden-anotherwarden": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/mcp-warden-magento-ts/dist/index.js",
+        "--warden-root",
+        "/Users/yourname/Documents/GitLab/anotherwarden/warden-envs-anotherwarden"
+      ],
+      "cwd": "/absolute/path/to/mcp-warden-magento-ts"
+    }
+  }
+}
+```
+
+**Usage in Claude Desktop:**
+- Restart Claude Desktop after configuration changes
+- Claude will automatically detect available tools from both servers
+- All responses include project identification: `[magento2 @ magento2.test]`
+
+### 3. Claude Code (VS Code Extension)
+
+**Installation:**
+1. Install the Claude Code extension from VS Code marketplace
+2. Configure MCP servers in VS Code settings
+
+**Configuration Example:**
+Add to your VS Code `settings.json`:
+```json
+{
+  "claude-code.mcpServers": {
+    "warden-magento": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/mcp-warden-magento-ts/dist/index.js",
+        "--warden-root",
+        "/Users/yourname/Documents/GitLab/warden-envs"
+      ],
+      "cwd": "/absolute/path/to/mcp-warden-magento-ts"
+    },
+    "warden-anotherwarden": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/mcp-warden-magento-ts/dist/index.js",
+        "--warden-root",
+        "/Users/yourname/Documents/GitLab/anotherwarden/warden-envs-anotherwarden"
+      ],
+      "cwd": "/absolute/path/to/mcp-warden-magento-ts"
+    }
+  }
+}
+```
+
+**Usage in Claude Code:**
+- Use Claude Code commands to interact with Magento environments
+- Each server appears as a separate MCP connection
+- Project identification helps distinguish between environments
+
 ---
 
-## Optional: persistent PTY (advanced)
+## 🛠️ Available Tools
 
-If you later decide to keep a session open in `php-fpm`, consider wiring a guarded PTY behind a whitelist (e.g., `node-pty`). Keep one PTY per project, auto‑recreate after `warden env stop/start`, and never forward free‑form shell strings. This repo does not include PTY code by default.
+### Magento Operations
+- `magento.cacheClean` — Clean Magento cache types
+- `magento.cacheFlush` — Flush Magento cache storage  
+- `magento.setupUpgrade` — Run setup:upgrade + cache clean
+- `magento.diCompile` — Compile dependency injection
+- `magento.staticDeploy` — Deploy static content
+- `magento.indexerReindex` — Reindex all indexers
+- `magento.modeShow` / `magento.modeSet` — Show/set deploy mode
+- `magento.configSet` / `magento.configShow` — Manage configuration
+
+### Warden Operations
+- `warden.exec` — Execute commands in containers
+- `warden.varnishFlush` — Clear Varnish cache
+- `warden.redisFlushAll` — Flush Redis (use with caution)
+- `warden.logsTail` — View recent container logs
+- `warden.showEnv` — Display sanitized environment variables
+- `warden.projectInfo` — Show current project information
+
+## 🏗️ Multi-Project Setup
+
+### Your GitLab Layout
+```
+~/Documents/GitLab/
+├── 
+│   ├── warden-envs/          # ← Point --warden-root here
+│   ├── app/
+│   └── ...
+└── anotherwarden/
+    ├── warden-envs-anotherwarden/  # ← Point --warden-root here
+    ├── app/
+    └── ...
+```
+
+### Running Multiple Servers
+```bash
+# Terminal 1: magento server
+node dist/index.js --warden-root /Users/yourname/Documents/GitLab/warden-envs
+
+# Terminal 2: anotherwarden server  
+node dist/index.js --warden-root /Users/yourname/Documents/GitLab/anotherwarden/warden-envs-anotherwarden
+```
+
+### Benefits
+- ✅ **Clear server names**: `warden-magento-magento` vs `warden-magento-anotherwarden`
+- ✅ **No parameter confusion**: No need to specify project in every tool call
+- ✅ **Concurrent usage**: Run operations on both projects simultaneously
+- ✅ **Project identification**: All responses prefixed with `[project/env @ domain]`
+
+## 📊 Logging
+
+### Log Levels & Environment Configuration
+- **Development** (`NODE_ENV=development`): Debug-level console logging with colors
+- **Production** (`NODE_ENV=production`): Warning-level file logging with rotation
+
+### File Logging (Production)
+When `NODE_ENV=production` or `LOG_TO_FILE=true`:
+- `logs/mcp-warden-magento.log` — All logs (JSON format, 5MB rotation)
+- `logs/mcp-warden-magento-error.log` — Error logs only
+
+### Environment Variables
+- `NODE_ENV` — Set to `production` for production logging
+- `LOG_TO_FILE` — Set to `true` to enable file logging in any environment  
+- `LOG_DIR` — Custom log directory (defaults to `./logs`)
+
+### Examples
+```bash
+# Development with debug logging
+NODE_ENV=development node dist/index.js --warden-root /path/to/warden/env
+
+# Production with file logging
+NODE_ENV=production node dist/index.js --warden-root /path/to/warden/env
+
+# Force file logging in development
+LOG_TO_FILE=true node dist/index.js --warden-root /path/to/warden/env
+```
+
+## 🔧 Development
+
+### Scripts
+- `pnpm run build` — Compile TypeScript to `dist/`
+- `pnpm run dev` — Run with tsx (development only)
+- `pnpm run lint` — Check code style
+- `pnpm run format` — Format code with Prettier
+
+### Testing
+```bash
+# Test with MCP Inspector
+npx @modelcontextprotocol/inspector node dist/index.js --warden-root /path/to/warden/env
+
+# Test specific tools
+# In Inspector UI, try: magento.cacheClean with { "types": ["config"] }
+# Or: warden.projectInfo (no parameters needed)
+```
+
+## 🔒 Security
+
+- **Structured inputs only**: All tools use Zod validation, no arbitrary shell execution
+- **Container isolation**: Commands run inside Warden containers via `warden env exec`
+- **Environment validation**: Server validates Warden project structure on startup
+- **Timeout protection**: All commands have execution timeouts (5 minutes default)
+- **Sanitized output**: Environment variables are redacted in logs and responses
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+**"keyValidator._parse is not a function"**
+- Install Zod 3.x: `pnpm remove zod && pnpm add zod@^3.23.8`
+
+**"WARDEN_ENV_NAME missing"**
+- Ensure you're pointing to the correct warden environment folder
+- Run `warden env-init` in your Magento project if needed
+
+**"Command not found: warden"**
+- Install Warden?
+- Start services: `warden svc up`
+
+**MCP client can't connect**
+- Ensure absolute paths in client configuration
+- Check that the built `dist/index.js` file exists
+- Verify Node.js ≥ 18 is installed
+
+### Debug Mode
+```bash
+NODE_ENV=development LOG_TO_FILE=true node dist/index.js --warden-root /path/to/env
+# Check logs/mcp-warden-magento.log for detailed information
+```
+
 
 ---
 
-## License
+## 🤝 Contributing
 
-MIT
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+For questions or issues, please open a GitHub issue with:
+- Your client configuration
+- Server logs (with sensitive data redacted)
+- Steps to reproduce the problem
