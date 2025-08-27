@@ -41,7 +41,7 @@ const fileFormat = winston.format.combine(
 const transports: winston.transport[] = [];
 
 // Determine stdio mode (when running under MCP transport, we must not log to console)
-const isStdioMode = parseBoolean(process.env.MCP_STDIO_MODE);
+const isStdioMode = (process.env.MCP_STDIO_MODE ?? "").toLowerCase() === "true";
 
 // Console transport only when NOT in stdio mode and in development for local debugging
 if (!isStdioMode && process.env.NODE_ENV !== "production") {
