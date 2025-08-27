@@ -2,11 +2,45 @@
   "name": "mcp-warden-magento",
   "version": "1.0.0",
   "type": "module",
-  "private": true,
+  "description": "A Model Context Protocol (MCP) server for Magento 2 operations within Warden environments",
+  "main": "dist/src/index.js",
+  "bin": {
+    "mcp-warden-magento": "dist/src/index.js"
+  },
+  "files": [
+    "dist/src/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "magento",
+    "warden",
+    "ai",
+    "assistant",
+    "tools"
+  ],
+  "author": "Sean Dearnaley",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/seandearnaley/mcp-warden-magento-ts.git"
+  },
+  "homepage": "https://github.com/seandearnaley/mcp-warden-magento-ts#readme",
+  "bugs": {
+    "url": "https://github.com/seandearnaley/mcp-warden-magento-ts/issues"
+  },
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
+    "build": "npx tsc && npm run postbuild",
+    "postbuild": "chmod +x dist/src/index.js",
+    "start": "node dist/src/index.js",
+    "prepublishOnly": "pnpm run check && pnpm run test && pnpm run build",
+    "publish:dry": "npm publish --dry-run",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:watch": "eslint . --watch",

@@ -13,6 +13,18 @@ A **Model Context Protocol (MCP)** server that provides AI assistants with safe,
 
 ## 🚀 Quick Start
 
+### Option 1: Install from npm (Recommended)
+
+```bash
+# Install globally
+npm install -g mcp-warden-magento
+
+# Or use directly with npx
+npx mcp-warden-magento --warden-root /Users/yourname/Documents/GitLab/warden-envs
+```
+
+### Option 2: Build from source
+
 1. **Install dependencies**
 
 ```bash
@@ -28,7 +40,7 @@ pnpm run build
 3. **Test with MCP Inspector**
 
 ```bash
-npx @modelcontextprotocol/inspector node dist/index.js --warden-root /Users/yourname/Documents/GitLab/warden-envs
+npx @modelcontextprotocol/inspector mcp-warden-magento --warden-root /Users/yourname/Documents/GitLab/warden-envs
 ```
 
 ### Development Mode
@@ -74,22 +86,29 @@ pnpm run build
 {
   "mcp.servers": {
     "warden-magento": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/mcp-warden-magento-ts/dist/index.js",
-        "--warden-root",
-        "/Users/yourname/Documents/GitLab/warden-envs"
-      ],
-      "cwd": "/absolute/path/to/mcp-warden-magento-ts"
+      "command": "npx",
+      "args": ["mcp-warden-magento", "--warden-root", "/Users/yourname/Documents/GitLab/warden-envs"]
     },
     "warden-anotherwarden": {
-      "command": "node",
+      "command": "npx",
       "args": [
-        "/absolute/path/to/mcp-warden-magento-ts/dist/index.js",
+        "mcp-warden-magento",
         "--warden-root",
         "/Users/yourname/Documents/GitLab/anotherwarden/warden-envs-anotherwarden"
-      ],
-      "cwd": "/absolute/path/to/mcp-warden-magento-ts"
+      ]
+    }
+  }
+}
+```
+
+**Alternative: Using global installation**
+
+```json
+{
+  "mcp.servers": {
+    "warden-magento": {
+      "command": "mcp-warden-magento",
+      "args": ["--warden-root", "/Users/yourname/Documents/GitLab/warden-envs"]
     }
   }
 }
@@ -114,22 +133,16 @@ pnpm run build
 {
   "mcpServers": {
     "warden-magento": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/mcp-warden-magento-ts/dist/index.js",
-        "--warden-root",
-        "/Users/yourname/Documents/GitLab/warden-envs"
-      ],
-      "cwd": "/absolute/path/to/mcp-warden-magento-ts"
+      "command": "npx",
+      "args": ["mcp-warden-magento", "--warden-root", "/Users/yourname/Documents/GitLab/warden-envs"]
     },
     "warden-anotherwarden": {
-      "command": "node",
+      "command": "npx",
       "args": [
-        "/absolute/path/to/mcp-warden-magento-ts/dist/index.js",
+        "mcp-warden-magento",
         "--warden-root",
         "/Users/yourname/Documents/GitLab/anotherwarden/warden-envs-anotherwarden"
-      ],
-      "cwd": "/absolute/path/to/mcp-warden-magento-ts"
+      ]
     }
   }
 }
@@ -155,22 +168,16 @@ Add to your VS Code `settings.json`:
 {
   "claude-code.mcpServers": {
     "warden-magento": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/mcp-warden-magento-ts/dist/index.js",
-        "--warden-root",
-        "/Users/yourname/Documents/GitLab/warden-envs"
-      ],
-      "cwd": "/absolute/path/to/mcp-warden-magento-ts"
+      "command": "npx",
+      "args": ["mcp-warden-magento", "--warden-root", "/Users/yourname/Documents/GitLab/warden-envs"]
     },
     "warden-anotherwarden": {
-      "command": "node",
+      "command": "npx",
       "args": [
-        "/absolute/path/to/mcp-warden-magento-ts/dist/index.js",
+        "mcp-warden-magento",
         "--warden-root",
         "/Users/yourname/Documents/GitLab/anotherwarden/warden-envs-anotherwarden"
-      ],
-      "cwd": "/absolute/path/to/mcp-warden-magento-ts"
+      ]
     }
   }
 }
@@ -226,10 +233,13 @@ Add to your VS Code `settings.json`:
 
 ```bash
 # Terminal 1: magento server
-node dist/index.js --warden-root /Users/yourname/Documents/GitLab/warden-envs
+npx mcp-warden-magento --warden-root /Users/yourname/Documents/GitLab/warden-envs
 
 # Terminal 2: anotherwarden server
-node dist/index.js --warden-root /Users/yourname/Documents/GitLab/anotherwarden/warden-envs-anotherwarden
+npx mcp-warden-magento --warden-root /Users/yourname/Documents/GitLab/anotherwarden/warden-envs-anotherwarden
+
+# Or if installed globally:
+mcp-warden-magento --warden-root /Users/yourname/Documents/GitLab/warden-envs
 ```
 
 ### Benefits
@@ -264,13 +274,13 @@ When `NODE_ENV=production` or `LOG_TO_FILE=true`:
 
 ```bash
 # Development with debug logging
-NODE_ENV=development node dist/index.js --warden-root /path/to/warden/env
+NODE_ENV=development npx mcp-warden-magento --warden-root /path/to/warden/env
 
 # Production with file logging
-NODE_ENV=production node dist/index.js --warden-root /path/to/warden/env
+NODE_ENV=production npx mcp-warden-magento --warden-root /path/to/warden/env
 
 # Force file logging in development
-LOG_TO_FILE=true node dist/index.js --warden-root /path/to/warden/env
+LOG_TO_FILE=true npx mcp-warden-magento --warden-root /path/to/warden/env
 ```
 
 ## 🔧 Development
@@ -286,7 +296,7 @@ LOG_TO_FILE=true node dist/index.js --warden-root /path/to/warden/env
 
 ```bash
 # Test with MCP Inspector
-npx @modelcontextprotocol/inspector node dist/index.js --warden-root /path/to/warden/env
+npx @modelcontextprotocol/inspector mcp-warden-magento --warden-root /path/to/warden/env
 
 # Test specific tools
 # In Inspector UI, try: magento.cacheClean with { "types": ["config"] }
@@ -345,11 +355,28 @@ Notes:
 ### Debug Mode
 
 ```bash
-NODE_ENV=development LOG_TO_FILE=true node dist/index.js --warden-root /path/to/env
+NODE_ENV=development LOG_TO_FILE=true npx mcp-warden-magento --warden-root /path/to/env
 # Check logs/mcp-warden-magento.log for detailed information
 ```
 
 ---
+
+## 📦 Publishing to npm
+
+For maintainers:
+
+```bash
+# Test the package locally
+pnpm run publish:dry
+
+# Publish to npm (requires npm login)
+npm publish
+
+# Or publish with pnpm
+pnpm publish
+```
+
+The `prepublishOnly` script will automatically run tests, linting, and build before publishing.
 
 ## 🤝 Contributing
 
