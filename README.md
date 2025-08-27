@@ -14,16 +14,19 @@ A **Model Context Protocol (MCP)** server that provides AI assistants with safe,
 ## 🚀 Quick Start
 
 1. **Install dependencies**
+
 ```bash
 pnpm install
 ```
 
 2. **Build the project**
+
 ```bash
 pnpm run build
 ```
 
 3. **Test with MCP Inspector**
+
 ```bash
 npx @modelcontextprotocol/inspector node dist/index.js --warden-root /Users/yourname/Documents/GitLab/warden-envs
 ```
@@ -31,6 +34,7 @@ npx @modelcontextprotocol/inspector node dist/index.js --warden-root /Users/your
 ### Development Mode
 
 For development with auto-reload (local terminal use only):
+
 ```bash
 pnpm run dev --warden-root /Users/yourname/Documents/GitLab/warden-envs
 ```
@@ -59,11 +63,13 @@ pnpm run build
 ### 1. Cursor IDE (Recommended)
 
 **Installation:**
+
 1. Open Cursor settings: `Cmd/Ctrl + ,`
 2. Search for "MCP" or go to Extensions → MCP
 3. Add server configurations to your workspace or user settings
 
 **Configuration Example:**
+
 ```json
 {
   "mcp.servers": {
@@ -80,7 +86,7 @@ pnpm run build
       "command": "node",
       "args": [
         "/absolute/path/to/mcp-warden-magento-ts/dist/index.js",
-        "--warden-root", 
+        "--warden-root",
         "/Users/yourname/Documents/GitLab/anotherwarden/warden-envs-anotherwarden"
       ],
       "cwd": "/absolute/path/to/mcp-warden-magento-ts"
@@ -90,6 +96,7 @@ pnpm run build
 ```
 
 **Usage in Cursor:**
+
 - Use `@warden-magento` to target the magento project
 - Use `@warden-anotherwarden` to target the anotherwarden project
 - Example: "Hey @warden-magento, clear the config cache"
@@ -97,10 +104,12 @@ pnpm run build
 ### 2. Claude Desktop
 
 **Installation:**
+
 1. Locate your Claude Desktop config: `~/Library/Application Support/Claude/claude_desktop_config.json`
 2. Add MCP server entries
 
 **Configuration Example:**
+
 ```json
 {
   "mcpServers": {
@@ -127,6 +136,7 @@ pnpm run build
 ```
 
 **Usage in Claude Desktop:**
+
 - Restart Claude Desktop after configuration changes
 - Claude will automatically detect available tools from both servers
 - All responses include project identification: `[magento2 @ magento2.test]`
@@ -134,11 +144,13 @@ pnpm run build
 ### 3. Claude Code (VS Code Extension)
 
 **Installation:**
+
 1. Install the Claude Code extension from VS Code marketplace
 2. Configure MCP servers in VS Code settings
 
 **Configuration Example:**
 Add to your VS Code `settings.json`:
+
 ```json
 {
   "claude-code.mcpServers": {
@@ -165,6 +177,7 @@ Add to your VS Code `settings.json`:
 ```
 
 **Usage in Claude Code:**
+
 - Use Claude Code commands to interact with Magento environments
 - Each server appears as a separate MCP connection
 - Project identification helps distinguish between environments
@@ -174,8 +187,9 @@ Add to your VS Code `settings.json`:
 ## 🛠️ Available Tools
 
 ### Magento Operations
+
 - `magento.cacheClean` — Clean Magento cache types
-- `magento.cacheFlush` — Flush Magento cache storage  
+- `magento.cacheFlush` — Flush Magento cache storage
 - `magento.setupUpgrade` — Run setup:upgrade + cache clean
 - `magento.diCompile` — Compile dependency injection
 - `magento.staticDeploy` — Deploy static content
@@ -184,6 +198,7 @@ Add to your VS Code `settings.json`:
 - `magento.configSet` / `magento.configShow` — Manage configuration
 
 ### Warden Operations
+
 - `warden.exec` — Execute commands in containers
 - `warden.varnishFlush` — Clear Varnish cache
 - `warden.redisFlushAll` — Flush Redis (use with caution)
@@ -194,9 +209,10 @@ Add to your VS Code `settings.json`:
 ## 🏗️ Multi-Project Setup
 
 ### Your GitLab Layout
+
 ```
 ~/Documents/GitLab/
-├── 
+├──
 │   ├── warden-envs/          # ← Point --warden-root here
 │   ├── app/
 │   └── ...
@@ -207,15 +223,17 @@ Add to your VS Code `settings.json`:
 ```
 
 ### Running Multiple Servers
+
 ```bash
 # Terminal 1: magento server
 node dist/index.js --warden-root /Users/yourname/Documents/GitLab/warden-envs
 
-# Terminal 2: anotherwarden server  
+# Terminal 2: anotherwarden server
 node dist/index.js --warden-root /Users/yourname/Documents/GitLab/anotherwarden/warden-envs-anotherwarden
 ```
 
 ### Benefits
+
 - ✅ **Clear server names**: `warden-magento-magento` vs `warden-magento-anotherwarden`
 - ✅ **No parameter confusion**: No need to specify project in every tool call
 - ✅ **Concurrent usage**: Run operations on both projects simultaneously
@@ -224,21 +242,26 @@ node dist/index.js --warden-root /Users/yourname/Documents/GitLab/anotherwarden/
 ## 📊 Logging
 
 ### Log Levels & Environment Configuration
+
 - **Development** (`NODE_ENV=development`): Debug-level console logging with colors (disabled automatically in MCP stdio mode)
 - **Production** (`NODE_ENV=production`): Warning-level file logging with rotation
 
 ### File Logging (Production)
+
 When `NODE_ENV=production` or `LOG_TO_FILE=true`:
+
 - `logs/mcp-warden-magento.log` — All logs (JSON format, 5MB rotation)
 - `logs/mcp-warden-magento-error.log` — Error logs only
 
 ### Environment Variables
+
 - `NODE_ENV` — Set to `production` for production logging
-- `LOG_TO_FILE` — Set to `true` to enable file logging in any environment  
+- `LOG_TO_FILE` — Set to `true` to enable file logging in any environment
 - `LOG_DIR` — Custom log directory (defaults to `./logs`)
 - `MCP_STDIO_MODE` — When `true`, disables console logging to protect MCP stdio transport
 
 ### Examples
+
 ```bash
 # Development with debug logging
 NODE_ENV=development node dist/index.js --warden-root /path/to/warden/env
@@ -253,12 +276,14 @@ LOG_TO_FILE=true node dist/index.js --warden-root /path/to/warden/env
 ## 🔧 Development
 
 ### Scripts
+
 - `pnpm run build` — Compile TypeScript to `dist/`
 - `pnpm run dev` — Run with tsx (development only)
 - `pnpm run lint` — Check code style
 - `pnpm run format` — Format code with Prettier
 
 ### Testing
+
 ```bash
 # Test with MCP Inspector
 npx @modelcontextprotocol/inspector node dist/index.js --warden-root /path/to/warden/env
@@ -274,6 +299,7 @@ npx @modelcontextprotocol/inspector node dist/index.js --warden-root /path/to/wa
 - E2E tests (Playwright): `pnpm run test:e2e`
 
 Notes:
+
 - Unit tests cover env parsing/redaction, output cleaning, and input validation.
 - E2E scaffolding is in place (Playwright) and ready to extend with a stubbed `warden` binary and an MCP stdio client.
 
@@ -289,34 +315,39 @@ Notes:
 
 ### Common Issues
 
-**"keyValidator._parse is not a function"**
+**"keyValidator.\_parse is not a function"**
+
 - Install Zod 3.x: `pnpm remove zod && pnpm add zod@^3.23.8`
 
 **"WARDEN_ENV_NAME missing"**
+
 - Ensure you're pointing to the correct warden environment folder
 - Run `warden env-init` in your Magento project if needed
 
 **"Command not found: warden"**
+
 - Install Warden?
 - Start services: `warden svc up`
 
 **MCP client can't connect**
+
 - Ensure absolute paths in client configuration
 - Check that the built `dist/index.js` file exists
 - Verify Node.js ≥ 18 is installed
 
 **"Request timed out" for DI compile or static deploy**
+
 - These operations can take 10-20 minutes on large projects
 - **MCP Inspector**: Increase timeout in Configuration → `MCP_SERVER_REQUEST_TIMEOUT` to 1200000 (20 minutes)
 - **Cursor/Claude**: The server automatically extends timeouts for long operations (20 minutes for DI compile)
 - If still timing out, the operation may be stuck - check Magento logs
 
 ### Debug Mode
+
 ```bash
 NODE_ENV=development LOG_TO_FILE=true node dist/index.js --warden-root /path/to/env
 # Check logs/mcp-warden-magento.log for detailed information
 ```
-
 
 ---
 
@@ -329,6 +360,7 @@ NODE_ENV=development LOG_TO_FILE=true node dist/index.js --warden-root /path/to/
 5. Submit a pull request
 
 For questions or issues, please open a GitHub issue with:
+
 - Your client configuration
 - Server logs (with sensitive data redacted)
 - Steps to reproduce the problem
