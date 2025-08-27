@@ -1,0 +1,55 @@
+# Source files
+src/
+tests/
+test-results/
+
+# Development files
+*.test.ts
+*.spec.ts
+.tsbuildinfo
+tsconfig.json
+vitest.config.ts
+playwright.config.ts
+
+# Build artifacts
+coverage/
+logs/
+
+# Development tools
+.eslintrc*
+eslint.config.js
+.prettierrc*
+.prettierignore
+
+# Git
+.git/
+.gitignore
+
+# CI/CD
+.github/
+
+# Development dependencies
+node_modules/
+
+# Package manager
+pnpm-lock.yaml
+yarn.lock
+package-lock.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation (development)
+CLAUDE.md
+AGENTS.md
+
+# Environment
+.env*
+!.env.example
