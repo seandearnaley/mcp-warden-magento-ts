@@ -2,6 +2,8 @@
 
 A **Model Context Protocol (MCP)** server that provides AI assistants with safe, structured access to **Magento 2** operations within **Warden** environments. Each server instance is bound to a specific Warden project, eliminating confusion when working with multiple environments.
 
+When working with Magento code with this tool enabled, good AI models will call the appropriate tools after edits. The AI knows when to clear cache, run di:compile, and run static:deploy better than most developers. This saves considerable time and eliminates context switching. It also makes accessing logs easier, which is normally a minor pain to do manually.
+
 ## ✨ Features
 
 - 🎯 **Project-specific servers**: Each instance serves one Warden environment
