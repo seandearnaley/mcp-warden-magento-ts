@@ -16,3 +16,8 @@ yarn.lock
 # GitHub templates (auto-generated, don't format)
 .github/ISSUE_TEMPLATE/
 .github/PULL_REQUEST_TEMPLATE/
+
+# GitHub Actions workflows (ignore formatting to prevent CI conflicts)
+.github/workflows/claude-code-review.yml
+.github/workflows/claude.yml
+CLAUDE.md
