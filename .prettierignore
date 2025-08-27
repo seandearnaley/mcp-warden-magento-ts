@@ -20,3 +20,4 @@ yarn.lock
 # GitHub Actions workflows (ignore formatting to prevent CI conflicts)
 .github/workflows/claude-code-review.yml
 .github/workflows/claude.yml
+CLAUDE.md
