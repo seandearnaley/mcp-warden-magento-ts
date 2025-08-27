@@ -36,8 +36,8 @@ try {
   logger.info(`Warden project validated successfully at: ${wardenRoot}`);
 } catch (error) {
   logger.error(`Warden project validation failed: ${error instanceof Error ? error.message : String(error)}`);
-  logger.error(`Usage: node dist/index.js --warden-root /path/to/warden/env/folder`);
-  logger.error(`Example: node dist/index.js --warden-root /Users/yourname/Documents/GitLab/warden-envs`);
+  logger.error(`Usage: npx mcp-warden-magento --warden-root /path/to/warden/env/folder`);
+  logger.error(`Example: npx mcp-warden-magento --warden-root /Users/yourname/Documents/GitLab/warden-envs`);
   process.exit(1);
 }
 
