@@ -1,5 +1,6 @@
 import winston from "winston";
 import * as path from "node:path";
+import * as fs from "node:fs";
 
 // Define log levels
 const levels = {
@@ -39,32 +40,58 @@ const fileFormat = winston.format.combine(
 // Define transports
 const transports: winston.transport[] = [];
 
-// NEVER add console transport for MCP servers - it breaks stdio JSON protocol
-// All logging goes to files only
+// Determine stdio mode (when running under MCP transport, we must not log to console)
+const isStdioMode = (process.env.MCP_STDIO_MODE ?? "").toLowerCase() === "true";
 
-// Always add file transport for MCP servers (no console output allowed)
-const logDir = process.env.LOG_DIR ?? path.join(process.cwd(), "logs");
-const logFile = path.join(logDir, "mcp-warden-magento.log");
+// Console transport only when NOT in stdio mode and in development for local debugging
+if (!isStdioMode && process.env.NODE_ENV !== "production") {
+  transports.push(
+    new winston.transports.Console({
+      level: level(),
+      format: winston.format.combine(
+        winston.format.colorize({ all: true }),
+        winston.format.timestamp(),
+        winston.format.printf(({ level, message, timestamp, context }) => {
+          const ctx = context ? `[${typeof context === "string" ? context : JSON.stringify(context)}] ` : "";
+          return `${timestamp as string} ${level}: ${ctx}${String(message)}`;
+        })
+      ),
+    })
+  );
+}
 
-transports.push(
-  new winston.transports.File({
-    filename: logFile,
-    format: fileFormat,
-    maxsize: 5242880, // 5MB
-    maxFiles: 5,
-  })
-);
+// File transports in production or when explicitly requested
+const enableFileLogging =
+  process.env.NODE_ENV === "production" || (process.env.LOG_TO_FILE ?? "").toLowerCase() === "true";
+if (enableFileLogging) {
+  const logDir = process.env.LOG_DIR ?? path.join(process.cwd(), "logs");
+  try {
+    fs.mkdirSync(logDir, { recursive: true });
+  } catch {
+    // ignore directory create errors; file transport will throw if it cannot write
+  }
 
-// Separate error log file
-transports.push(
-  new winston.transports.File({
-    filename: path.join(logDir, "mcp-warden-magento-error.log"),
-    level: "error",
-    format: fileFormat,
-    maxsize: 5242880, // 5MB
-    maxFiles: 5,
-  })
-);
+  const logFile = path.join(logDir, "mcp-warden-magento.log");
+  transports.push(
+    new winston.transports.File({
+      filename: logFile,
+      format: fileFormat,
+      maxsize: 5242880, // 5MB
+      maxFiles: 5,
+    })
+  );
+
+  // Separate error log file
+  transports.push(
+    new winston.transports.File({
+      filename: path.join(logDir, "mcp-warden-magento-error.log"),
+      level: "error",
+      format: fileFormat,
+      maxsize: 5242880, // 5MB
+      maxFiles: 5,
+    })
+  );
+}
 
 // Create the logger
 export const logger = winston.createLogger({

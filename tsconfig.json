@@ -11,9 +11,7 @@
     "incremental": true,
     "tsBuildInfoFile": ".tsbuildinfo"
   },
-  "include": [
-    "src"
-  ],
+  "include": ["src", "tests", "playwright.config.ts", "vitest.config.ts"],
   "watchOptions": {
     "watchFile": "useFsEventsOnParentDirectory",
     "watchDirectory": "useFsEvents",

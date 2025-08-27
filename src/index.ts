@@ -5,9 +5,22 @@ import { registerWardenTools } from "./tools/warden.js";
 import { assertWardenProject } from "./lib/exec.js";
 import { logger } from "./lib/logger.js";
 import * as path from "node:path";
+import process from "node:process";
 
 // Set environment variable to prevent console logging in stdio mode
 process.env.MCP_STDIO_MODE = "true";
+
+// Basic process lifecycle and error handling
+process.on("unhandledRejection", (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  logger.error(`Unhandled promise rejection: ${msg}`);
+  process.exitCode = 2;
+});
+
+process.on("uncaughtException", (err) => {
+  logger.error(`Uncaught exception: ${err.message}`);
+  process.exit(2);
+});
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -48,3 +61,13 @@ const transport = new StdioServerTransport();
 logger.info("Connecting to MCP transport...");
 await server.connect(transport);
 logger.info("MCP server connected successfully");
+
+// Graceful shutdown
+const shutdown = (signal: string) => {
+  logger.warn(`Received ${signal}. Shutting down MCP server...`);
+  // Stdio transport will end when process exits
+  process.exit(0);
+};
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
