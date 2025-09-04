@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { wardenExec, wardenLogsTail, getProjectInfo } from "../lib/exec.js";
+import { wardenExec, wardenLogsTail, getProjectInfo, run } from "../lib/exec.js";
 import { readDotEnv, sanitizeEnv } from "../lib/env.js";
 
 export function validateWardenExecInput(service: unknown, argv: unknown): { ok: boolean; reason?: string } {
@@ -103,4 +103,117 @@ export function registerWardenTools(server: McpServer, projectRoot: string) {
 
     return { content: [{ type: "text", text: `${projectInfo} Project Information\n\n${info}` }] };
   });
+
+  // Execute READ-ONLY SQL queries via the db container
+  server.tool(
+    "warden.dbQuery",
+    "Run a safe, read-only SQL query in the db container",
+    {
+      sql: z.string().describe("SQL to execute (SELECT/SHOW/DESCRIBE/EXPLAIN only)"),
+      database: z.string().optional().describe("Database name; defaults to MYSQL_DATABASE from .env"),
+      output: z
+        .enum(["table", "tsv", "csv", "raw"]) // table is human readable; tsv/csv/raw for tooling
+        .optional()
+        .default("table"),
+    },
+    async (args) => {
+      const { sql, database, output } = args as {
+        sql: string;
+        database?: string;
+        output?: "table" | "tsv" | "csv" | "raw";
+      };
+
+      // Simple read-only enforcement
+      const sanitized = sql
+        .replace(/\/\*[\s\S]*?\*\//g, " ") // block comments
+        .replace(/--[^\n]*$/gm, " ") // line comments -- ...
+        .replace(/#[^\n]*$/gm, " ") // hash comments
+        .trim();
+
+      const statements = sanitized
+        .split(/;+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const mutatingRegex = new RegExp(
+        String.raw`\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|RENAME|REPLACE|GRANT|REVOKE|SET\s+(?!SESSION\s+transaction_read_only)|CALL|LOAD\s+DATA|INTO\s+OUTFILE)\b`,
+        "i"
+      );
+      for (const stmt of statements) {
+        // Allow only SELECT/SHOW/DESCRIBE/EXPLAIN and read-only SET SESSION transaction_read_only
+        const isAllowed =
+          /^(SELECT|SHOW|DESCRIBE|EXPLAIN|WITH)\b/i.test(stmt) ||
+          /^SET\s+SESSION\s+transaction_read_only\s*=\s*(ON|1)\s*$/i.test(stmt);
+        if (!isAllowed || mutatingRegex.test(stmt)) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `${projectInfo} DB Query Rejected\n\nOnly read-only queries are allowed. Disallowed statement: ${stmt}`,
+              },
+            ],
+          };
+        }
+      }
+
+      // Mirror `warden db connect` usage and pass flags through to mysql
+      // warden db connect automatically connects to the default database
+      const mysqlArgs: string[] = ["db", "connect", "--default-character-set=utf8mb4"];
+
+      // Only specify database if explicitly requested (override default)
+      if (database) {
+        mysqlArgs.push("-D", database);
+      }
+
+      switch (output) {
+        case "table":
+          mysqlArgs.push("-t");
+          break;
+        case "tsv":
+          mysqlArgs.push("-B"); // batch = tab-separated
+          break;
+        case "csv":
+          mysqlArgs.push("-B");
+          break;
+        case "raw":
+          mysqlArgs.push("-N", "-B", "-r"); // no headers, tab-separated, raw
+          break;
+        default:
+          mysqlArgs.push("-t");
+      }
+
+      mysqlArgs.push("-e", sanitized);
+
+      // Run via `warden db connect` so credentials are handled by Warden
+      const res = await run("warden", mysqlArgs, projectRoot);
+      let raw = res.ok ? res.stdout : `${res.stdout}\n${res.stderr}`;
+
+      if (output === "csv") {
+        // Convert MySQL -B tab-separated output to CSV (best-effort)
+        const lines = raw.split(/\r?\n/);
+        raw = lines
+          .map((line) =>
+            line
+              .split("\t")
+              .map((field) => {
+                if (field.includes('"') || field.includes(",") || field.includes("\n")) {
+                  return `"${field.replace(/"/g, '""')}"`;
+                }
+                return field;
+              })
+              .join(",")
+          )
+          .join("\n");
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `${projectInfo} DB Query (${output ?? "table"})\n\n${raw.trim() || "(no rows)"}`,
+          },
+        ],
+      };
+    }
+  );
 }
