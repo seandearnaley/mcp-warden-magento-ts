@@ -43,8 +43,9 @@ const transports: winston.transport[] = [];
 // Determine stdio mode (when running under MCP transport, we must not log to console)
 const isStdioMode = (process.env.MCP_STDIO_MODE ?? "").toLowerCase() === "true";
 
-// Console transport only when NOT in stdio mode and in development for local debugging
-if (!isStdioMode && process.env.NODE_ENV !== "production") {
+// Console transport is disabled by default to protect MCP stdio.
+// Opt-in via LOG_TO_CONSOLE=true when debugging locally.
+if (!isStdioMode && process.env.NODE_ENV !== "production" && (process.env.LOG_TO_CONSOLE ?? "").toLowerCase() === "true") {
   transports.push(
     new winston.transports.Console({
       level: level(),
