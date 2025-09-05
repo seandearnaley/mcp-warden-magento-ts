@@ -4,12 +4,31 @@ import { wardenMagento, getProjectInfo, cleanMagentoOutput, wardenExec } from ".
 import { createLogger } from "../lib/logger.js";
 import { readDotEnv } from "../lib/env.js";
 import * as fs from "node:fs";
+import { registerApiDocsTools } from "./magento-api-docs.js";
+import { registerApiTryTool } from "./magento-api-try.js";
+import { registerMagentoCliTools } from "./magento-cli.js";
 
 export function registerMagentoTools(server: McpServer, projectRoot: string) {
   const logger = createLogger("magento-tools");
   const projectInfo = getProjectInfo(projectRoot);
 
   logger.info(`Registering Magento tools for project: ${projectInfo}`);
+
+  // Prevent duplicate tool registration during refactor period
+  const alreadyRegistered = new Set<string>();
+  const originalTool = server.tool.bind(server);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (server as any).tool = (name: string, description: string, schema: unknown, handler: unknown) => {
+    if (alreadyRegistered.has(name)) return;
+    alreadyRegistered.add(name);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+    originalTool(name, description, schema as any, handler as any);
+  };
+
+  // Register modular groups
+  registerApiDocsTools(server, projectRoot);
+  registerApiTryTool(server, projectRoot);
+  registerMagentoCliTools(server, projectRoot);
 
   // Helper: Perform punchin auth using cXML and return curl cookie args
   async function punchinCookieArgs(
@@ -412,12 +431,17 @@ export function registerMagentoTools(server: McpServer, projectRoot: string) {
 
       let authHeaders: string[] = [];
       if (authenticate) {
-        let xmlContent: string | undefined;
-        if (punchinXmlPath && fs.existsSync(punchinXmlPath)) {
-          xmlContent = fs.readFileSync(punchinXmlPath, "utf8");
+        try {
+          let xmlContent: string | undefined;
+          if (punchinXmlPath && fs.existsSync(punchinXmlPath)) {
+            xmlContent = fs.readFileSync(punchinXmlPath, "utf8");
+          }
+          const cookieFile = authenticateReuse ? `/tmp/mcp-cookies-${hostHeader}.txt` : undefined;
+          const { punchinCookieArgs } = await import("./magento-helpers.js");
+          authHeaders = await punchinCookieArgs(projectRoot, baseCurlUrl, hostHeader, xmlContent, cookieFile);
+        } catch {
+          // Ignore punchin errors; continue unauthenticated
         }
-        const cookieFile = authenticateReuse ? `/tmp/mcp-cookies-${hostHeader}.txt` : undefined;
-        authHeaders = await punchinCookieArgs(baseCurlUrl, hostHeader, xmlContent, cookieFile);
       }
 
       const curlArgs: string[] = ["curl", "-s", "-k", "-H", `Host: ${hostHeader}`];

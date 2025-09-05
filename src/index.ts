@@ -30,15 +30,15 @@ const wardenRootIndex = args.findIndex((arg) => arg === "--warden-root");
 const wardenRoot =
   wardenRootIndex !== -1 && args[wardenRootIndex + 1] ? path.resolve(args[wardenRootIndex + 1]) : process.cwd();
 
-// Validate warden root
+// Validate warden root (do not exit; allow MCP to start with tools even if invalid)
 try {
   assertWardenProject(wardenRoot);
   logger.info(`Warden project validated successfully at: ${wardenRoot}`);
 } catch (error) {
-  logger.error(`Warden project validation failed: ${error instanceof Error ? error.message : String(error)}`);
-  logger.error(`Usage: npx mcp-warden-magento --warden-root /path/to/warden/env/folder`);
-  logger.error(`Example: npx mcp-warden-magento --warden-root /Users/yourname/Documents/GitLab/warden-envs`);
-  process.exit(1);
+  logger.warn(
+    `Warden project validation failed: ${error instanceof Error ? error.message : String(error)}. Starting MCP anyway; many tools may fail until --warden-root is set to a valid Warden project.`
+  );
+  logger.warn(`Usage: --warden-root /path/to/warden/env`);
 }
 
 // Get project info for better identification

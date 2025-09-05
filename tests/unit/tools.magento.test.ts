@@ -4,8 +4,41 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 // Mock exec helpers used by Magento tools
 vi.mock("../../src/lib/exec.js", () => {
+  const wardenMagento = vi.fn().mockResolvedValue({ ok: true, stdout: "OK", stderr: "", code: 0, durationMs: 1 });
+
+  const wardenExec = vi.fn((_projectRoot: string, _service: string, argv: string[]) => {
+    const joined = argv.join(" ");
+    // Simulate discovery of one webapi.xml
+    if (argv[0] === "find" && argv.includes("webapi.xml")) {
+      return Promise.resolve({
+        ok: true,
+        code: 0,
+        stdout: "app/code/Foo/Bar/etc/webapi.xml\n",
+        stderr: "",
+        durationMs: 1,
+      });
+    }
+    // Read webapi.xml contents
+    if (joined.includes("cat app/code/Foo/Bar/etc/webapi.xml")) {
+      const xml = `<?xml version="1.0"?>\n<routes>\n  <route url="/V1/test/:id" method="GET">\n    <service class="Foo\\Bar\\Api\\TestInterface" method="getById"/>\n    <resources>\n      <resource ref="anonymous"/>\n    </resources>\n  </route>\n</routes>`;
+      return Promise.resolve({ ok: true, code: 0, stdout: xml, stderr: "", durationMs: 1 });
+    }
+    // Read interface signature
+    if (joined.includes("cat app/code/Foo/Bar/Api/TestInterface.php")) {
+      const php = `<?php\nnamespace Foo\\Bar\\Api;\ninterface TestInterface {\n  /** Get by id */\n  public function getById(string $id, int $size = 10);\n}`;
+      return Promise.resolve({ ok: true, code: 0, stdout: php, stderr: "", durationMs: 1 });
+    }
+    // Curl calls (apiTry/apiCall)
+    if (argv[0] === "curl") {
+      return Promise.resolve({ ok: true, code: 0, stdout: '{"ok":true}', stderr: "", durationMs: 1 });
+    }
+    // Default noop
+    return Promise.resolve({ ok: true, code: 0, stdout: "", stderr: "", durationMs: 1 });
+  });
+
   return {
-    wardenMagento: vi.fn().mockResolvedValue({ ok: true, stdout: "OK", stderr: "", code: 0, durationMs: 1 }),
+    wardenMagento,
+    wardenExec,
     getProjectInfo: vi.fn(() => "[proj]"),
     cleanMagentoOutput: (s: string) => s.trim(),
   } as any;
@@ -164,5 +197,59 @@ describe("registerMagentoTools", () => {
     const res = await tool!.handler({ path: "web/seo/use_rewrites" });
     expect(execMock.wardenMagento).toHaveBeenCalledWith("/proj", ["config:show", "web/seo/use_rewrites"]);
     expect(res.content[0].text).toContain("Config Show");
+  });
+
+  it("apiDocs summary lists totals and modules", async () => {
+    const typed = server as unknown as McpServer;
+    registerMagentoTools(typed, "/proj");
+    const tool = server.tools.find((t) => t.name === "magento.apiDocs");
+    expect(tool).toBeTruthy();
+    const res = await tool!.handler({ format: "summary" });
+    const text = res.content[0].text;
+    expect(text).toContain("API Catalog");
+    expect(text).toContain("Total endpoints: 1");
+    expect(text).toContain("Foo/Bar: 1");
+  });
+
+  it("apiDocs endpoints-only paginates", async () => {
+    const typed = server as unknown as McpServer;
+    registerMagentoTools(typed, "/proj");
+    const tool = server.tools.find((t) => t.name === "magento.apiDocs");
+    expect(tool).toBeTruthy();
+    const res = await tool!.handler({ format: "endpoints-only", limit: 1, offset: 0 });
+    const text = res.content[0].text;
+    expect(text).toContain("Endpoints 1-1 of 1");
+    expect(text).toContain("GET /V1/test/");
+  });
+
+  it("apiDocsEndpoint returns endpoint details with params", async () => {
+    const typed = server as unknown as McpServer;
+    registerMagentoTools(typed, "/proj");
+    const tool = server.tools.find((t) => t.name === "magento.apiDocsEndpoint");
+    expect(tool).toBeTruthy();
+    const res = await tool!.handler({ id: "Foo\\Bar\\Api\\TestInterface.getById" });
+    const text = res.content[0].text;
+    expect(text).toContain("Endpoint");
+    expect(text).toContain("ID: Foo\\Bar\\Api\\TestInterface.getById");
+    expect(text).toContain("Method: GET");
+    expect(text).toContain("Path: /V1/test/:id");
+    expect(text).toContain("Params:");
+    expect(text).toContain("id: string");
+    expect(text).toContain("size: int (optional) = 10");
+  });
+
+  it("apiTry builds curl and returns output", async () => {
+    const typed = server as unknown as McpServer;
+    registerMagentoTools(typed, "/proj");
+    const tool = server.tools.find((t) => t.name === "magento.apiTry");
+    expect(tool).toBeTruthy();
+    const res = await tool!.handler({
+      id: "Foo\\Bar\\Api\\TestInterface.getById",
+      params: { id: "A-1", size: 3, extra: "x" },
+      methodOverride: "GET",
+    });
+    const text = res.content[0].text;
+    expect(text).toContain("apiTry GET /V1/test/A-1");
+    expect(text).toContain('{"ok":true}');
   });
 });
