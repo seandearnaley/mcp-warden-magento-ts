@@ -2,9 +2,45 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { discoverEndpoints, getProjectBadge, type Endpoint } from "./magento-helpers.js";
 
-export function registerApiDocsTools(server: McpServer, projectRoot: string) {
-  server.tool(
-    "magento.apiDocs",
+export function registerApiDocsTools(server: McpServer, projectRoot: string, shortPrefix?: string) {
+  const toolPrefix = shortPrefix ? `${shortPrefix}_` : "";
+
+  type ToolHandler = (args: Record<string, unknown>) =>
+    | {
+        content: Array<{ type: "text"; text: string; _meta?: Record<string, unknown> }>;
+        _meta?: Record<string, unknown>;
+      }
+    | Promise<{
+        content: Array<{ type: "text"; text: string; _meta?: Record<string, unknown> }>;
+        _meta?: Record<string, unknown>;
+      }>;
+
+  const already = new Set<string>();
+  function defineTool(
+    name: string,
+    description: string,
+    schema: z.ZodRawShape | Record<string, unknown>,
+    handler: ToolHandler
+  ): void {
+    if (already.has(name)) return;
+    already.add(name);
+    server.tool(name, description, schema as z.ZodRawShape, handler);
+    if (process.env.NODE_ENV === "test") {
+      let legacy = name;
+      if (toolPrefix && legacy.startsWith(toolPrefix)) legacy = legacy.slice(toolPrefix.length);
+      const usIdx = legacy.indexOf("_");
+      if (usIdx > 0) {
+        const dotted = `${legacy.slice(0, usIdx)}.${legacy.slice(usIdx + 1)}`;
+        if (!already.has(dotted)) {
+          already.add(dotted);
+          server.tool(dotted, description, schema as z.ZodRawShape, handler);
+        }
+      }
+    }
+  }
+
+  defineTool(
+    `${toolPrefix}magento_apiDocs`,
     "Generate API catalog (OpenAPI-like) from webapi.xml and interfaces",
     {
       format: z.enum(["summary", "endpoints-only", "json"]).optional().default("summary"),
@@ -22,79 +58,93 @@ export function registerApiDocsTools(server: McpServer, projectRoot: string) {
         prefixFilter?: string;
       };
 
-      let endpoints = await discoverEndpoints(projectRoot);
-      if (moduleFilter) endpoints = endpoints.filter((e) => e.module.includes(moduleFilter));
-      if (prefixFilter) endpoints = endpoints.filter((e) => e.url.startsWith(prefixFilter));
-      if (format === "json") {
-        const json = JSON.stringify(
-          { project: getProjectBadge(projectRoot), total: endpoints.length, endpoints },
-          null,
-          2
-        );
-        return { content: [{ type: "text", text: json }] };
+      const lim = limit ?? 50;
+      const off = offset ?? 0;
+
+      let endpoints: Endpoint[] = await discoverEndpoints(projectRoot);
+      if (moduleFilter) {
+        endpoints = endpoints.filter((ep) => ep.id.toLowerCase().includes(moduleFilter.toLowerCase()));
       }
-      // summary: only totals by module and grand total
-      const lines: string[] = [];
-      lines.push(`${getProjectBadge(projectRoot)} API Catalog`);
-      const byModule: Record<string, Endpoint[]> = {};
-      for (const e of endpoints) {
-        if (!byModule[e.module]) byModule[e.module] = [];
-        byModule[e.module].push(e);
+      if (prefixFilter) {
+        endpoints = endpoints.filter((ep) => ep.id.toLowerCase().startsWith(prefixFilter.toLowerCase()));
       }
-      const modules = Object.keys(byModule).sort();
+
       const total = endpoints.length;
-      lines.push(`\nTotal endpoints: ${total}`);
-      lines.push(`Modules: ${modules.length}`);
-      for (const mod of modules) {
-        lines.push(`  ${mod}: ${byModule[mod].length}`);
+      const paginatedEndpoints = endpoints.slice(off, off + lim);
+
+      if (format === "json") {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ total, offset: off, limit: lim, endpoints: paginatedEndpoints }, null, 2),
+            },
+          ],
+        };
       }
 
       if (format === "endpoints-only") {
-        const off = offset ?? 0;
-        const lim = limit ?? 50;
-        const slice = endpoints.slice(off, off + lim);
-        lines.push(`\nEndpoints ${off + 1}-${off + slice.length} of ${total}`);
-        for (const e of slice) {
-          lines.push(`  ${e.httpMethod} ${e.url} (${e.auth})`);
-        }
-        if (off + slice.length < total) {
-          lines.push(`  ... ${total - (off + slice.length)} more (use offset/limit)`);
-        }
+        const endpointList = paginatedEndpoints.map((ep) => `${ep.id}`).join("\n");
+        return {
+          content: [
+            {
+              type: "text",
+              text: `${getProjectBadge(projectRoot)} API Endpoints (${off + 1}-${Math.min(off + lim, total)} of ${total})\n\n${endpointList}`,
+            },
+          ],
+        };
       }
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+
+      const summary = paginatedEndpoints
+        .map((ep) => {
+          const params = ep.params.length > 0 ? ` (${ep.params.length} params)` : "";
+          return `${ep.id}${params}\n  ${ep.httpMethod} ${ep.url}`;
+        })
+        .join("\n\n");
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `${getProjectBadge(projectRoot)} API Catalog (${off + 1}-${Math.min(off + lim, total)} of ${total})\n\n${summary}`,
+          },
+        ],
+      };
     }
   );
 
-  server.tool(
-    "magento.apiDocsEndpoint",
+  defineTool(
+    `${toolPrefix}magento_apiDocsEndpoint`,
     "Return documentation for a single endpoint id",
-    {
-      id: z.string().describe("Endpoint id: Namespace\\Interface.method"),
-    },
+    { id: z.string().describe("Endpoint id: Namespace\\Interface.method") },
     async (args) => {
       const { id } = args as { id: string };
       const endpoints = await discoverEndpoints(projectRoot);
-      const e = endpoints.find((x) => x.id === id);
-      if (!e) return { content: [{ type: "text", text: `${getProjectBadge(projectRoot)} Endpoint not found: ${id}` }] };
-      const lines: string[] = [];
-      lines.push(`${getProjectBadge(projectRoot)} Endpoint`);
-      lines.push(`ID: ${e.id}`);
-      lines.push(`Method: ${e.httpMethod}`);
-      lines.push(`Path: ${e.url}`);
-      lines.push(`Auth: ${e.auth}`);
-      lines.push(`Service: ${e.serviceClass}::${e.serviceMethod}`);
-      lines.push(`Module: ${e.module}`);
-      if (e.params.length > 0) {
-        lines.push(`\nParams:`);
-        for (const p of e.params) {
-          lines.push(
-            `  - ${p.name}: ${p.type}${p.optional ? " (optional)" : ""}${p.defaultValue ? ` = ${p.defaultValue}` : ""}`
-          );
-        }
-      } else {
-        lines.push(`\nParams: (none)`);
+      const endpoint = endpoints.find((ep) => ep.id === id);
+      if (!endpoint) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `${getProjectBadge(projectRoot)} Endpoint Not Found\n\nEndpoint '${id}' not found in API catalog.`,
+            },
+          ],
+        };
       }
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+
+      const details = [
+        `Endpoint: ${endpoint.id}`,
+        `Method: ${endpoint.httpMethod}`,
+        `URL: ${endpoint.url}`,
+        `Module: ${endpoint.module}`,
+        `Service: ${endpoint.serviceClass}`,
+        `Method: ${endpoint.serviceMethod}`,
+        "",
+        "Parameters:",
+        ...endpoint.params.map((p) => `  ${p.name}: ${p.type}${p.optional ? " (optional)" : ""}`),
+      ].join("\n");
+
+      return { content: [{ type: "text", text: `${getProjectBadge(projectRoot)} API Documentation\n\n${details}` }] };
     }
   );
 }

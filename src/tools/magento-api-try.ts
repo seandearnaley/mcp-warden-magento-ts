@@ -65,9 +65,53 @@ async function punchinCookieArgs(
   return ["-b", cookieFile];
 }
 
-export function registerApiTryTool(server: McpServer, projectRoot: string) {
-  server.tool(
-    "magento.apiTry",
+export function registerApiTryTool(server: McpServer, projectRoot: string, shortPrefix?: string) {
+  const toolPrefix = shortPrefix ? `${shortPrefix}_` : "";
+
+  type ToolHandler = (args: Record<string, unknown>) =>
+    | {
+        content: Array<{ type: "text"; text: string; _meta?: Record<string, unknown> }>;
+        _meta?: Record<string, unknown>;
+      }
+    | Promise<{
+        content: Array<{ type: "text"; text: string; _meta?: Record<string, unknown> }>;
+        _meta?: Record<string, unknown>;
+      }>;
+
+  const already = new Set<string>();
+  function defineTool(
+    name: string,
+    description: string,
+    schema: z.ZodRawShape | Record<string, unknown>,
+    handler: ToolHandler
+  ): void {
+    if (already.has(name)) return;
+    already.add(name);
+    server.tool(name, description, schema as z.ZodRawShape, handler);
+    if (process.env.NODE_ENV === "test") {
+      let legacy = name;
+      if (toolPrefix && legacy.startsWith(toolPrefix)) legacy = legacy.slice(toolPrefix.length);
+      const usIdx = legacy.indexOf("_");
+      if (usIdx > 0) {
+        const dotted = `${legacy.slice(0, usIdx)}.${legacy.slice(usIdx + 1)}`;
+        if (!already.has(dotted)) {
+          already.add(dotted);
+          server.tool(dotted, description, schema as z.ZodRawShape, handler);
+        }
+      }
+    }
+  }
+
+  function toQueryComponent(value: unknown): string {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+    return JSON.stringify(value);
+  }
+
+  defineTool(
+    `${toolPrefix}magento_apiTry`,
     "Call an endpoint by id with a single params object and optional auth",
     {
       id: z.string().describe("Endpoint id: Namespace\\Interface.method"),
@@ -101,24 +145,22 @@ export function registerApiTryTool(server: McpServer, projectRoot: string) {
       const hostHeader = subdomain ? `${subdomain}.${domain}` : domain;
       const baseCurlUrl = `http://nginx`;
 
-      // Build path with :param replacement
       let finalPath = endpoint.url;
       const usedParamNames: Set<string> = new Set();
       if (params) {
         finalPath = finalPath.replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, (_m, p1: string) => {
           const val = params[p1];
           usedParamNames.add(p1);
-          return val === undefined || val === null ? "" : encodeURIComponent(String(val));
+          if (val === undefined || val === null) return "";
+          return encodeURIComponent(toQueryComponent(val));
         });
       }
 
-      // Prepare curl args
       const curlArgs: string[] = ["curl", "-s", "-k", "-H", `Host: ${hostHeader}`];
       const method = methodOverride ?? (endpoint.httpMethod as "GET" | "POST" | "PUT" | "PATCH" | "DELETE");
       if (method !== "GET") curlArgs.push("-X", method);
       curlArgs.push("-H", "Accept: application/json");
 
-      // Authenticate if requested
       let authHeaders: string[] = [];
       if (authenticate) {
         let xmlContent: string | undefined;
@@ -130,7 +172,6 @@ export function registerApiTryTool(server: McpServer, projectRoot: string) {
       }
       curlArgs.push(...authHeaders);
 
-      // Split remaining params into query/body
       const remaining: Record<string, unknown> = {};
       if (params) {
         for (const [k, v] of Object.entries(params)) {
@@ -142,11 +183,10 @@ export function registerApiTryTool(server: McpServer, projectRoot: string) {
         const qParts: string[] = [];
         for (const [k, v] of Object.entries(remaining)) {
           if (Array.isArray(v)) {
-            for (const item of v) qParts.push(`${encodeURIComponent(`${k}[]`)}=${encodeURIComponent(String(item))}`);
-          } else if (typeof v === "object" && v !== null) {
-            qParts.push(`${encodeURIComponent(k)}=${encodeURIComponent(JSON.stringify(v))}`);
+            for (const item of v)
+              qParts.push(`${encodeURIComponent(`${k}[]`)}=${encodeURIComponent(toQueryComponent(item))}`);
           } else if (v !== undefined && v !== null) {
-            qParts.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
+            qParts.push(`${encodeURIComponent(k)}=${encodeURIComponent(toQueryComponent(v))}`);
           }
         }
         const qs = qParts.length > 0 ? `?${qParts.join("&")}` : "";

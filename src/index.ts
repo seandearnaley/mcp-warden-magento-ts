@@ -43,9 +43,21 @@ try {
 
 // Get project info for better identification
 const projectName = path.basename(path.dirname(wardenRoot));
+const wardenDirName = path.basename(wardenRoot);
+const uniqueId = `${projectName}-${wardenDirName}`;
+
+// Create a short prefix for tool names (max 60 char limit)
+// Use first 2-3 chars of project + first 1-2 chars of warden dir
+function createShortPrefix(projectName: string, wardenDirName: string): string {
+  const projectPrefix = projectName.replace(/[^a-zA-Z0-9]/g, "").substring(0, 3);
+  const wardenPrefix = wardenDirName.replace(/[^a-zA-Z0-9]/g, "").substring(0, 2);
+  return `${projectPrefix}${wardenPrefix}`;
+}
+
+const shortPrefix = createShortPrefix(projectName, wardenDirName);
 
 const server = new McpServer({
-  name: `warden-magento-${projectName}`,
+  name: `warden-magento-${uniqueId}`,
   version: "1.0.0",
   capabilities: {
     tools: {},
@@ -54,10 +66,10 @@ const server = new McpServer({
   },
 });
 
-logger.info(`Initializing MCP server: mcp-warden-magento-${path.basename(wardenRoot)} v1.0.0`);
+logger.info(`Initializing MCP server: warden-magento-${uniqueId} v1.0.0`);
 
-registerMagentoTools(server, wardenRoot);
-registerWardenTools(server, wardenRoot);
+registerMagentoTools(server, wardenRoot, shortPrefix);
+registerWardenTools(server, wardenRoot, shortPrefix);
 
 const transport = new StdioServerTransport();
 logger.info("Connecting to MCP transport...");
